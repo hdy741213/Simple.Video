@@ -1,0 +1,2862 @@
+﻿一 、裁剪视频
+
+ffmpeg提供简单的命令参数： 
+ffmpeg -ss START -t DURATION -i INPUT -vcodec copy -acodec copy OUTPUT 
+对上面的命令稍做个解释。 
+-ss 开始时间，如： 00:00:20，表示从20秒开始； 
+-t 时长，如： 00:00:10，表示截取10秒长的视频； 
+-i 输入，后面是空格，紧跟着就是输入视频文件； 
+-vcodec copy 和 -acodec copy表示所要使用的视频和音频的编码格式，这里指定为copy表示原样拷贝； 
+INPUT，输入视频文件； 
+OUTPUT，输出视频文件；
+
+比如： 
+ffmpeg -ss 00:00:20 -t 00:00:10 -i D:/MyVideo.mpg -vcodec copy -acopy copy D:/Split.mpg 
+这个命令就是从20秒开始裁剪到20+10=30秒结束，总共10秒的视频。这个命令执行很快，因为只是原始数据的拷贝，中间没有什么编码和解码的过程。 
+执行这个命令后你能得到Split.mpg这个输出文件。你可以用视频播放软件播放这个视频看看。可能有些视频裁剪后的效果，如期望一致，20秒开始，30秒结束，总共10秒的视频，但是有些视频裁剪后你会发现可能开始和结束都不是很准确，有可能是从18秒开始，33秒结束。这是为什么呢？ 
+因为这些视频里20秒和30秒处地方刚好不是关键帧，而ffmpeg会在你输入的这两个时间点附近圆整到最接近的关键帧处，然后做接下来的事情。如果你不懂什么是关键帧，没关系，这也不影响你使用这个命令。
+
+如果你的要求能够接受几秒的误差，那么这个命令完全就可以满足你的需要，接下来的内容你也没有必要往下看了。
+
+但是在我项目里要求很严格，一定要到确定的时间。所以要用另外一种方式。 
+上面的造成那样的原因是所选的时间不是关键帧，那如果我们将输入的视频先转换成所有的帧都为关键帧的视频，其实就是将所有的帧的编码方式转为帧内编码（不理解帧内编码也没关系，你就当没看见它，接着往下看），这个问题就有解了。ffmpeg也可以帮我们完成这个事情。
+
+ffmpeg -i INPUT -sameq -intra OUTPUT 
+-i 输入，后面是空格，紧跟着就是输入视频文件； 
+INPUT 输入文件； 
+-sameq 表示保持同样的视频质量； 
+-intra， 帧内编码； 
+OUTPUT 输出文件名。
+
+如： 
+ffmpeg -i D:/MyVideo.mpg -sameq -intra D:/temp.mpg 
+这个命令的结果文件就是D:/temp.mpg.这个文件的视频和D:/MyVideo.mpg是一样的，但是你会发现这个文件会比D:/MyVideo.mpg大很多倍，原因就是转换前一般采用的帧间编码，转换后变成了帧内编码。这里我们说是一般，原因是有些视频文件本身就采用了帧内编码。
+
+接下来我们就开始裁剪。 
+ffmpeg -ss START -vsync 0 -t DURATION -i INPUT -vcodec VIDEOCODEC-acodec AUDIOCODEC OUTPUT 
+-ss 开始时间，如： 00:00:20，表示从20秒开始； 
+-t 时长，如： 00:00:10，表示截取10秒长的视频； 
+-i 输入，后面是空格，紧跟着就是输入视频文件； 
+-vcodec 视频的编码格表示所要使用的视频式； 
+-acodec 音频的编码格表示所要使用的视频式； 
+INPUT，输入视频文件； 
+OUTPUT，输出视频文件；
+
+如： 
+ffmpeg -ss 00:00:30 -vsync 0 -t 00:00:30 -i D:/temp.mpg -vcodec libx264-acodec libfaac D:/result.mpg 
+这里音频和视频分别采用了aac和h264.
+
+这样就得到了我们最终想要的结果。
+
+二 、合并视频
+
+上面我们可以将一个视频中感兴趣的部分裁剪出来，比如我们裁剪出3段视频，而裁剪出来的视频，我们不想它是一个一个的，而是一整个。总的需求就是给定一个视频，用户可以挑选出自己喜欢的一些时间段，然后开始裁剪，最后得到那些挑选的时间段组成的视频。
+
+要完成这个任务，有了前面我们裁剪视频的基础就好办多了，利用前面的方法将各个感兴趣的视频裁剪出了，这样得到多个小视频，然后再用下面的方法就可以实现：
+
+现在这里声明一下，下面红色的部分是我早之前的版本，是错误，因此误导了大家，非常的抱歉。
+
+所以直接忽略红色的部分，看后面的内容
+
+【合并成一个完整的视频： 
+ffmpeg -i INPUT1 -i INPUT2 -f FORMAT -acodec AUDIOCODEC -vcodec VIDEOCODEC -sameq OUTPUT
+
+这里的几乎所有用到的参数已经在上面做过解释，除了-f.
+
+-f FORMAT, 表示视频的格式。如-f MP4, 那么我们的视频格式就是MP4。
+
+另外，你几个想要的合并的视频就加入几个-i [Input file], 例如下面我有2个视频要合并.
+
+ffmpeg -i D:/MyVideo1.avi -i D:/MyVideo2.avi -f mp4 -acodec libfaac -vcodec libx264 -sameq D:/Result.avi
+
+这里的Result.avi, 你也可以改成是Result.mp4， 也没有问题。
+
+如果你发现执行完上面的命令后，结果视频（result.avi）不是2个视频的合并，可能是前面你合并视频的时候2个视频的格式不一致导致，或者你所使用ffmpeg的版本有这个bug，你可以换下面的方法再尝试。 
+1. 将要合并的视频先转换成统一的格式，包括编码格式，帧率，尺寸。 
+ffmpeg -i [input] -f mpeg -r 25 [out]
+
+让后用copy或者cat命令合并。】
+
+首先将各个视频全部转换为mpeg格式： 
+ffmpeg -i INPUT -f mpeg OUTPUT
+
+例如： 
+ffmpeg -i D:/temp1.avi -f mpeg D:/result1.mpg 
+ffmpeg -i D:/temp2.mp4 -f mpeg D:/result2.mpg
+
+通过copy或者cat命令合并视频 
+copy -b INPUT+INPUT OUTPUT
+例如： 
+copy /b “D:/result1.mpg”+”D:/result1.mpg” “D:/result.mpge”
+
+将合并的视频进行编码生成最终的结果视频 
+ffmpeg -i INPUT -f FORMAT OUTPUT
+例如： 
+ffmpeg -i “D:/result.mpge” -f mp4 “D:/result.mp4”
+
+目前又开始测MPEG1和MPEG2的解码，在准备编码好的测试序列过程中，需要通过编码器来进行原始视频序列的编码操作，以生成我们需要的测试数据。由于IPP example提供的Encoder不支持MPEG1，经过查询，决定MPEG1的编码使用FFMPEG。FFMEPG是个啥子东西呢，这里简单说一下：FFmpeg是用于录制、转换和流化音频和视频的完整解决方案，一套领先的音/视频编解码类库。 
+FFmpeg的官方网址是 http://ffmpeg.mplayerhq.hu/ 。 
+中文Wiki是 http://www.ffmpeg.com.cn/ ，资料很多。 
+由于其免费开源性，遂决定就用它来进行视频格式的压缩转换啦。首先再来啰嗦一点儿基本的FFmpeg主主要组成部分： 
+1). libavcodec： 一个包含了所有FFmpeg音视频编解码器的库。 
+2). libavformat： 一个包含了所有的普通音视格式的解析器和产生器的库。 
+三个实例程序(这三个实例基本可以作为API使用手册)： 
+ffmpeg：命令行的视频格式转换程序。 
+ffplay：视频播放程序。（需要SDL支持） 
+ffserver：多媒体服务器 
+了解了它的大体组织结构，就明确了ffmpeg当然是我在寻找视频格式压缩转换的第一选择！ 
+由于FFmpeg 在Linux上开发的开源项目，把它放在windows下进行编译实在是比较复杂啊，这个过程往往弄得新手很是头大！！！，比如鄙人。好了，今天的重点不在于ffmpeg的编译，因而就不在此一一记录了，网上去找，关于ffmpeg编译的方法何其之多，这里给大家几个不错的参考链接： 
+对于Linux上的用户，可以参考 
+http://www.ffmpeg.com.cn/index.php/Ffmpeg%E7%BC%96%E8%AF%91%E8%AF%A6%E8%A7%A3 
+对于Windows用户，可参考 
+http://bbs.chinavideo.org/viewthread.php?tid=1897&extra=page%3D1 或 
+http://blog.sina.com.cn/s/blog_4673bfa501008xie.html 
+总之编译是个很复杂的过程，我们还是加快速度，来领略ffmpeg的风采。 
+在命令行下，键入ffmepg.exe -h ，以看其帮助，好家伙，其参数之多，还真是觉得无从下手啊，这么多参数，又该如何正确的设置呢？ 
+于是连Google带使用摸索，将ffmpeg的参数在这里做一简要整理和记录，以备日后使用时查看方便。 
+基本使用方式：ffmpeg [[options][`-i’ input_file]] {[options] output_file} 
+a) 通用选项 
+-L license 
+-h 帮助 
+-fromats 显示可用的格式，编解码的，协议的。。。 
+-f fmt 强迫采用格式fmt 
+-i filename 输入文件 
+-y 覆盖输出文件（即如果test.*文件已经存在的话，不经提示就覆盖掉了） 
+-t duration 设置纪录时间 hh:mm:ss[.xxx]格式的记录时间也支持 
+-ss position 搜索到指定的时间 [-]hh:mm:ss[.xxx]的格式也支持。使用-ss参数的作用，可以从指定时间点开始转换任务，-ss后的时间单位为秒 
+-title string 设置标题（比如PSP中显示影片的标题） 
+-author string 设置作者 
+-copyright string 设置版权 
+-comment string 设置评论 
+-target type 设置目标文件类型(vcd,svcd,dvd) 所有的格式选项（比特率，编解码以及缓冲区大小）自动设置 ，只需要输入如下的就可以了：ffmpeg -i myfile.avi -target vcd vcd.mpg 
+-hq 激活高质量设置 
+-itsoffset offset 设置以秒为基准的时间偏移，该选项影响所有后面的输入文件。该偏移被加到输入文件的时戳，定义一个正偏移意味着相应的流被延迟了 offset秒。 [-]hh:mm:ss[.xxx]的格式也支持。 
+b) 视频选项 
+-b bitrate 设置比特率，缺省200kb/s 
+-vb bitrate set bitrate (in bits/s) 
+-vframes number 设置要编码多少帧 
+-r fps 设置帧频 缺省25 
+-s size 设置帧大小 格式为W*H 缺省160X128.也可以直接使用简写，也认：Sqcif qcif cif 4cif 等 
+-s size 设置帧大小 格式为WXH 缺省160X128.下面的简写也可以直接使用： 
+Sqcif 128X96 qcif 176X144 cif 252X288 4cif 704X576 
+-aspect aspect 设置横纵比 4:3 16:9 或 1.3333 1.7777 
+-croptop size 设置顶部切除带大小 像素单位 
+-cropbottom size -cropleft size -cropright size 
+-padtop size 设置顶部补齐的大小 像素单位 
+-padbottom size -padleft size -padright size -padcolor color 设置补齐条颜色(hex,6个16进制的数，红:绿:兰排列，比如 000000代表黑色) 
+-vn 不做视频记录 
+-bt tolerance 设置视频码率容忍度kbit/s （固定误差） 
+-maxrate bitrate设置最大视频码率容忍度 （可变误差） 
+-minrate bitreate 设置最小视频码率容忍度（可变误差） 
+-bufsize size 设置码率控制缓冲区大小 
+-vcodec codec 强制使用codec编解码方式，如-vcodec xvid 使用xvid压缩 如果用copy表示原始编解码数据必须被拷贝。 
+-sameq 使用同样视频质量作为源（VBR） 
+-pass n 选择处理遍数（1或者2）。两遍编码非常有用。第一遍生成统计信息，第二遍生成精确的请求的码率 
+-passlogfile file 选择两遍的纪录文件名为file 
+c)高级视频选项 
+-g gop_size 设置图像组大小 这里设置GOP大小，也表示两个I帧之间的间隔 
+-intra 仅适用帧内编码 
+-qscale q 使用固定的视频量化标度(VBR) 以质量为基础的VBR，取值0.01-255，约小质量越好，即qscale 4和-qscale 6，4的质量比6高 。此参数使用次数较多，实际使用时发现，qscale是种固定量化因子，设置qscale之后，前面设置的-b好像就无效了，而是自动调整了比特率。 
+-qmin q 最小视频量化标度(VBR) 设定最小质量，与-qmax（设定最大质量）共用 
+-qmax q 最大视频量化标度(VBR) 使用了该参数，就可以不使用qscale参数 
+-qdiff q 量化标度间最大偏差 (VBR) 
+-qblur blur 视频量化标度柔化(VBR) 
+-qcomp compression 视频量化标度压缩(VBR) 
+-rc_init_cplx complexity 一遍编码的初始复杂度 
+-b_qfactor factor 在p和b帧间的qp因子 
+-i_qfactor factor 在p和i帧间的qp因子 
+-b_qoffset offset 在p和b帧间的qp偏差 
+-i_qoffset offset 在p和i帧间的qp偏差 
+-rc_eq equation 设置码率控制方程 默认tex^qComp 
+-rc_override override 特定间隔下的速率控制重载 
+-me method 设置运动估计的方法 可用方法有 zero phods log x1 epzs(缺省) full 
+-dct_algo algo 设置dct的算法 可用： 
+0 FF_DCT_AUTO 缺省的DCT 
+1 FF_DCT_FASTINT 
+2 FF_DCT_INT 
+3 FF_DCT_MMX 
+4 FF_DCT_MLIB 
+5 FF_DCT_ALTIVEC 
+-idct_algo algo 设置idct算法。可用的有： 
+0 FF_IDCT_AUTO 缺省的IDCT 
+1 FF_IDCT_INT 
+2 FF_IDCT_SIMPLE 
+3 FF_IDCT_SIMPLEMMX 
+4 FF_IDCT_LIBMPEG2MMX 
+5 FF_IDCT_PS2 
+6 FF_IDCT_MLIB 
+7 FF_IDCT_ARM 
+8 FF_IDCT_ALTIVEC 
+9 FF_IDCT_SH4 
+10 FF_IDCT_SIMPLEARM 
+-er n 设置错误残留为n 
+1 FF_ER_CAREFULL 缺省 
+2 FF_ER_COMPLIANT 
+3 FF_ER_AGGRESSIVE 
+4 FF_ER_VERY_AGGRESSIVE 
+-ec bit_mask 设置错误掩蔽为bit_mask,该值为如下值的位掩码 1 FF_EC_GUESS_MVS (default=enabled) 2 FF_EC_DEBLOCK (default=enabled) 
+-bf frames 使用frames个B 帧，支持mpeg1,mpeg2,mpeg4（即如果-bf 2的话，在两个非b帧中间隔的b帧数目为2，即IBBPBBPBBP结构） 
+-mbd mode 宏块决策 
+0 FF_MB_DECISION_SIMPLE 使用mb_cmp 
+1 FF_MB_DECISION_BITS 2 FF_MB_DECISION_RD 
+-4mv 使用4个运动矢量 仅用于mpeg4 
+-part 使用数据划分 仅用于mpeg4 
+-bug param 绕过没有被自动监测到编码器的问题 
+-strict strictness 跟标准的严格性 
+-aic 使能高级帧内编码 h263+ 
+-umv 使能无限运动矢量 h263+ 
+-deinterlace 不采用交织方法 
+-interlace 强迫交织法编码 仅对mpeg2和mpeg4有效。当你的输入是交织的并且你想要保持交织以最小图像损失的时候采用该选项。可选的方法是不交织，但是损失更大 
+-psnr 计算压缩帧的psnr 
+-vstats 输出视频编码统计到vstats_hhmmss.log 
+-vhook module 插入视频处理模块 module 包括了模块名和参数，用空格分开 
+-bitexact 使用标准比特率 
+-max_qdiff 视频中所有桢（包括i/b/P）的最大Q值差距 
+-b_qfactor 表示i/p与B的Q值比例因子,值越大B桢劣化越严重 
+-b_qoffset 表示1/p与B的Q值比例的偏移量,值越大B桢劣化越严重.如果大于0,那么下一个B的Q=前一个P的Q乘以b_quant_factor再加上offset,如果小于0,则B的Q=负的normal_Q乘以factor加上offset. 
+-i_qfactor p和i的Q值比例因子,越接近1则P越优化. 
+-i_qoffset p和i的Q的偏移量
+
+D)音频选项 
+-ab bitrate 设置音频码率 
+-ar freq 设置音频采样率 
+-ac channels 设置通道 缺省为1，即单通道 
+-an 不使能音频纪录 
+-acodec codec 使用codec编解码 如：-acodec AAC 使用AAC音频编码 
+好了，先整理这些吧，其实键入ffmpeg -h后给出的参数等说明还有更多，这里就不一一列举了。红色部分标注了测试中经常使用到的，其他的以后用到了再一一补充吧。
+
+
+1.修改分辨率率
+将输入为640*480的修改为320*249
+
+ffmpeg -i input -vf scale=iw/2:-2 output
+
+iw:输入帧宽，此处为640,640/2=320。
+
+-1告诉scale filter保持纵横比，所以scale filter计算出值240.
+
+
+
+2.改变音视频播放速度
+1>视频2倍播放速度，音频两倍播放速度。
+
+ffmpeg -i input.mkv -filter:v "setpts=0.5*PTS" output.mkv
+
+注意，此种方式会丢帧。可以通过改变输出帧率来避免丢帧。
+
+ffmpeg -i input.mkv -r 16 -filter:v "setpts=0.25*PTS" -an output.mkv
+
+
+
+2>视频0.5倍播放速度
+
+ffmpeg -i input.mkv -filter:v "setpts=2.0*PTS"
+
+
+
+3>改变音频播放速度
+
+ffmpeg -i input.mkv -filter:a "atempo=2.0" -vn output.mkv
+
+atempo filter的取值范围是0.5-2.0.
+
+音频4倍播放速度实现方式：
+
+ffmepg -i input.mkv -filter:a "atempo=2.0,atempo=2.0" -vn output.mkv
+
+
+
+4>同步改变音视频
+
+ffmpeg -i input.mkv -filter_complex "[0:v]setpts=0.5*PTS[v];[0:a]atempo=2.0[a]" -map "[v]" -map "[a]" output.mkv
+
+注意：[v];[0:a]之间是分号！
+
+
+
+3.filtergraph
+
+
+命令行参数-vf 后面跟着的就是filtergraph描述
+
+一个filtergraph后面可以跟着几个chains，每个chain可包含一个或多个filter
+
+下面几个命令行的作用是相等的。
+
+ffmpeg -i input -vf [in]scale=iw/2:-1[out] output
+
+ffmpeg -i input -vf scale=iw/2:-1 output
+
+同样：
+
+ffmpeg -i input -vf [in]yadif=0:0:0[middle];[middle]scale=iw/2:-1[out] output #包含两个chains，每个chains含有一个filter，两个chains通过middle连接
+
+ffmpeg -i input -vf [in]yadif=0:0:0,scale=iw/2:-1[out] output #1个chain，包含两个filter
+
+ffmpeg -i input -vf yadif=0:0:0,scale=iw/2:-1 output
+
+
+
+testsrc是ffmpeg提供的一段视频。
+
+下面的命令的效果是：
+
+
+
+ffmpeg -f lavfi -i testsrc -f lavfi -i testsrc -f lavfi -i testsrc -f lavfi -i testsrc -filter_complex
+
+"[0:v]pad=iw*2:ih*2[a];
+
+[1:v]negate[b];
+
+[2:v]hflip[c];
+
+[3:v]edgedetect[d];
+[a][b]overlay=w[x];
+
+[x][c]overlay=0:h[y];
+
+[y][d]overlay=w:h[out]" 
+
+-map "[out]" -c:v ffv1 -t 5 multi.avi
+
+
+4.hflip
+作用是水平旋转画面：
+
+例如：
+
+ffmpeg -f lavfi -i testsrc -vf "hflip" output.avi
+
+
+
+5.negate
+对输入帧取反。黑的变白的等等。。。
+
+
+
+6.edgedetect
+ffmpeg -f lavfi -i testsrc -vf "edgedetect[d]" out.avi
+
+作用如图：
+
+
+7.选择选项
+例如：只选择I帧进行处理
+
+ffmpeg -i input -vf select='eq(pict_type\,PICT_TYPE_I)' output
+
+ffmpeg -i input -vf select="yadif=0:-1:0,scale=iw/2:-1" output
+
+
+8.添加水印
+ffmpeg -y -i style.ts -vf "movie=helloworld.png[wm];[in][wm]overlay=1:1[out]" output.avi(位于左上角)
+ffmpeg -y -i style.ts -vf "movie=helloworld.png[wm];[in][wm]overlay=main_w-overlay_w-10:10[out]" output.avi(位于右上角)
+ffmpeg -y -i style.ts -vf "movie=helloworld.png[wm];[in][wm]overlay=10:main_h-overlay_h-10[out]" output.avi(左下角)
+ffmpeg -y -i style.ts -vf "movie=helloworld.png[wm];[in][wm]overlay=main_w-overlay_w-10:main_h-overlay_h-10[out]" output.avi(右下角)
+
+这种方式添加水印后会导致视频质量下降，具体的原因还不清楚，如果有谁清楚可以给我留言。
+
+================================================================================================================================================
+
+原文：http://www.catswhocode.com/blog/19-ffmpeg-commands-for-all-needs
+
+ 
+
+ 
+
+ 
+
+ffmpeg is a multiplatform, open-source library for video and audio files. I have compiled 19 useful and amazing commands covering almost all needs: video conversion, sound extraction, encoding file for iPod or PSP, and more.
+Getting infos from a video file
+ffmpeg -i video.avi
+Turn X images to a video sequence
+ffmpeg -f image2 -i image%d.jpg video.mpg
+This command will transform all the images from the current directory (named image1.jpg, image2.jpg, etc…) to a video file named video.mpg.
+
+Turn a video to X images
+ffmpeg -i video.mpg image%d.jpg
+This command will generate the files named image1.jpg, image2.jpg, …
+
+The following image formats are also availables : PGM, PPM, PAM, PGMYUV, JPEG, GIF, PNG, TIFF, SGI.
+
+Encode a video sequence for the iPpod/iPhone
+ffmpeg -i source_video.avi input -acodec aac -ab 128kb -vcodec mpeg4 -b 1200kb -mbd 2 -flags +4mv+trell
+ -aic 2 -cmp 2 -subcmp 2 -s 320x180 -title X final_video.mp4
+Explanations :
+
+Source : source_video.avi
+Audio codec : aac
+Audio bitrate : 128kb/s
+Video codec : mpeg4
+Video bitrate : 1200kb/s
+Video size : 320px par 180px
+Generated video : final_video.mp4
+Encode video for the PSP
+ffmpeg -i source_video.avi -b 300 -s 320x240 -vcodec xvid -ab 32 -ar 24000 -acodec aac final_video.mp4
+Explanations :
+
+Source : source_video.avi
+Audio codec : aac
+Audio bitrate : 32kb/s
+Video codec : xvid
+Video bitrate : 1200kb/s
+Video size : 320px par 180px
+Generated video : final_video.mp4
+Extracting sound from a video, and save it as Mp3
+ffmpeg -i source_video.avi -vn -ar 44100 -ac 2 -ab 192 -f mp3 sound.mp3
+Explanations :
+
+Source video : source_video.avi
+Audio bitrate : 192kb/s
+output format : mp3
+Generated sound : sound.mp3
+Convert a wav file to Mp3
+ffmpeg -i son_origine.avi -vn -ar 44100 -ac 2 -ab 192 -f mp3 son_final.mp3
+Convert .avi video to .mpg
+ffmpeg -i video_origine.avi video_finale.mpg
+Convert .mpg to .avi
+ffmpeg -i video_origine.mpg video_finale.avi
+Convert .avi to animated gif(uncompressed)
+ffmpeg -i video_origine.avi gif_anime.gif
+Mix a video with a sound file
+ffmpeg -i son.wav -i video_origine.avi video_finale.mpg
+Convert .avi to .flv
+ffmpeg -i video_origine.avi -ab 56 -ar 44100 -b 200 -r 15 -s 320x240 -f flv video_finale.flv
+Convert .avi to dv
+ffmpeg -i video_origine.avi -s pal -r pal -aspect 4:3 -ar 48000 -ac 2 video_finale.dv
+Or:
+
+ffmpeg -i video_origine.avi -target pal-dv video_finale.dv
+Convert .avi to mpeg for dvd players
+ffmpeg -i source_video.avi -target pal-dvd -ps 2000000000 -aspect 16:9 finale_video.mpeg
+Explanations :
+
+target pal-dvd : Output format
+ps 2000000000 maximum size for the output file, in bits (here, 2 Gb)
+aspect 16:9 : Widescreen
+Compress .avi to divx
+ffmpeg -i video_origine.avi -s 320x240 -vcodec msmpeg4v2 video_finale.avi
+Compress Ogg Theora to Mpeg dvd
+ffmpeg -i film_sortie_cinelerra.ogm -s 720x576 -vcodec mpeg2video -acodec mp3 film_terminÃ©e.mpg
+Compress .avi to SVCD mpeg2
+NTSC format:
+
+ffmpeg -i video_origine.avi -target ntsc-svcd video_finale.mpg
+PAL format:
+
+ffmpeg -i video_origine.avi -target pal-svcd video_finale.mpg
+Compress .avi to VCD mpeg2
+NTSC format:
+
+ffmpeg -i video_origine.avi -target ntsc-vcd video_finale.mpg
+PAL format:
+
+ffmpeg -i video_origine.avi -target pal-vcd video_finale.mpg
+Multi-pass encoding with ffmpeg
+ffmpeg -i fichierentree -pass 2 -passlogfile ffmpeg2pass fichiersortie-2
+Find a webhost with ffmpeg enabled
+Cirtex Hosting got web hosting plans starting at $2.99.
+
+CirtexHosting – FFMpeg Hosting (Exclusive ClipBucket/PHPMotion/Vidiscript Auto-installer Free!)
+HostV – FFMpeg / Red5 Hosting (Exclusive ClipBucket/PHPMotion/Vidiscript Auto-installer Free!)
+This article is an English adaptation of Jean Cartier ffmpeg exemples.
+
+======================================================================================================
+ffmpeg -ss 10 -i input.flv -y -f image2  -vframes 100 -s 352x240 b-%03d.jpg  
+Java代码  收藏代码
+   
+ 参数解释:
+
+-i  输入文件
+
+-y  覆盖
+
+-f  生成图片格式
+
+-ss 开始截图时间 seconds or in hh:mm:ss[.xxx] 如果截图开始时间越接近篇尾，所花费的时间就会越长
+
+-vframes  截图帧数 或者 使用 -t : 截图时长 seconds, or hh:mm:ss[.xxx]
+
+-s  图片宽高比
+
+b-%3d.jpg 格式化文件命名,会生成 b-001.jpg，b-002.jpg 等。
+
+注意设定长宽高的话，像素比较低
+
+
+
+二 ffmpeg7个技巧：
+
+1 音频转换
+ffmpeg -i my_audio.wav  my_audio.mp3
+-i 后为要转换的音频文件,my_audio.mp3为目的音频文件
+2 视频转换
+ffmpeg -i my_video.mpeg -s 500×500 my_video.flv
+-i 后为源视频文件, -s 表示设置目标视频文件的分辨率   my_video.flv为目的视频文件
+3 从视频中截取图片
+ffmpeg -i test.mpg image%d.jpg
+默认1s截取25张图片,可以通过-r设置每秒截取的图片数量
+-r fps 设置帧率,也就是每秒截取图片的数量(默认25)
+ffmpeg -i test.mpg -r 1 image%d.jpg
+这样子每1s截取1张图片
+还可以设置截取间隔,起止
+-ss 设定时间位置,语法:hh:mm:ss[.xxx]
+-t 时长:限制转码/捕获视频的时间,语法:hh:mm:ss[.xxx]
+ffmpeg -i test.mpg -r 25 -ss 00:00:10 -t 00:00:05 images%05d.png
+在第10秒开始,以每秒截取25张图片的速度,截取5秒时长的图片
+4 从视频中采集音频
+ffmpeg -i video.avi -f mp3 audio.mp3
+-f 强制选择格式
+ffmpeg -i video.avi -vn audio.mp3
+-vn 取消截取视频(也就是只输出音频文件)
+5 创建截屏视频
+ffmpeg -f x11grab -r 25 -s wxga -i :0.0 /tmp/outputFile.mpg
+0.0 是你X11 server的屏幕显示号吗,和DISPLAY一样样的.
+此条命令以每秒25帧的速率来截取wxga屏幕视频,当然这里可以用-s 来设置视频分辨率,输出文件是/tmp/outputFile.mpg
+6 用图片制作视频
+ffmpeg -f image2 -i img%d.jpg /tmp/a.mpg
+将`img001.jpg’, `img002.jpg'这种顺序排列的图片文件转制作为视频
+7 从webcam中截取视频
+ffmpeg -f video4linux2 -s 320x240 -i /dev/video0 out.mpg
+同时截取音频和视频:
+ffmpeg -f oss -i /dev/dsp -f video4linux2 -s 320x240 -i /dev/video0 out.mpg
+/dev/video0为视频设备 /dev/dsp为音频设备
+
+转载自：http://www.2cto.com/kf/201302/191889.html
+
+转载自二：http://blog.csdn.net/zl8762385/article/details/9800689
+======================================================================================================
+直播流截图
+
+ffmpeg -probesize 32768 -i rtmp://115.28.34.157:1935/myapp/test1 -y -t 0.001 -ss 1 -f image2 -r 1 /home/rtmp.jpeg
+1
+1、将文件当做直播送至live
+
+ffmpeg -re -i localFile.mp4 -c copy -f flv rtmp://server/live/streamName
+1
+2、将直播媒体保存至本地文件
+
+ffmpeg -i rtmp://server/live/streamName -c copy dump.flv
+1
+3、将其中一个直播流，视频改用h264压缩，音频不变，送至另外一个直播服务流
+
+ffmpeg -i rtmp://server/live/originalStream -c:a copy -c:v libx264 -vpre slow -f flv rtmp://server/live/h264Stream
+1
+4、将其中一个直播流，视频改用h264压缩，音频改用faac压缩，送至另外一个直播服务流
+
+ffmpeg -i rtmp://server/live/originalStream -c:a libfaac -ar 44100 -ab 48k -c:v libx264 -vpre slow -vpre baseline -f flv rtmp://server/live/h264Stream
+1
+5、将其中一个直播流，视频不变，音频改用faac压缩，送至另外一个直播服务流
+
+ffmpeg -i rtmp://server/live/originalStream -acodec libfaac -ar 44100 -ab 48k -vcodec copy -f flv rtmp://server/live/h264_AAC_Stream
+1
+6、将一个高清流，复制为几个不同视频清晰度的流重新发布，其中音频不变
+
+ffmpeg -re -i rtmp://server/live/high_FMLE_stream -acodec copy -vcodec x264lib -s 640×360 -b 500k -vpre medium -vpre baseline rtmp://server/live/baseline_500k -acodec copy -vcodec x264lib -s 480×272 -b 300k -vpre medium -vpre baseline rtmp://server/live/baseline_300k -acodec copy -vcodec x264lib -s 320×200 -b 150k -vpre medium -vpre baseline rtmp://server/live/baseline_150k -acodec libfaac -vn -ab 48k rtmp://server/live/audio_only_AAC_48k
+1
+2
+7、功能一样，只是采用-x264opts选项
+
+ffmpeg -re -i rtmp://server/live/high_FMLE_stream -c:a copy -c:v x264lib -s 640×360 -x264opts bitrate=500:profile=baseline:preset=slow rtmp://server/live/baseline_500k -c:a copy -c:v x264lib -s 480×272 -x264opts bitrate=300:profile=baseline:preset=slow rtmp://server/live/baseline_300k -c:a copy -c:v x264lib -s 320×200 -x264opts bitrate=150:profile=baseline:preset=slow rtmp://server/live/baseline_150k -c:a libfaac -vn -b:a 48k rtmp://server/live/audio_only_AAC_48k
+1
+8、将当前摄像头及音频通过DSSHOW采集，视频h264、音频faac压缩后发布
+
+ffmpeg -r 25 -f dshow -s 640×480 -i video=”video source name”:audio=”audio source name” -vcodec libx264 -b 600k -vpre slow -acodec libfaac -ab 128k rtmp://server/application/stream_name
+1
+9、将一个JPG图片经过h264压缩循环输出为mp4视频
+
+ffmpeg.exe -i INPUT.jpg -an -vcodec libx264 -coder 1 -flags +loop -cmp +chroma -subq 10 -qcomp 0.6 -qmin 10 -qmax 51 -qdiff 4 -flags2 +dct8x8 -trellis 2 -partitions +parti8x8+parti4x4 -crf 24 -threads 0 -r 25 -g 25 -y OUTPUT.mp4
+1
+10、将普通流视频改用h264压缩，音频不变，送至高清流服务(新版本FMS live=1)
+
+ffmpeg -i rtmp://server/live/originalStream -c:a copy -c:v libx264 -vpre slow -f flv “rtmp://server
+======================================================================================================
+1、提取图片
+
+FFmpeg  -ss  start_time  -t  last_time  -i  video_path  -f  image2  -r  fps  -q:v  2   image_path
+
+其中：start_time 表示起始时间，一般表现为 00:00:00，last_time 表示持续时间，格式同起始时间。-to 可以指定结束时间，单位以秒记。
+
+-f  iamge2 指定图片编码格式，-r 指定提取频率，-q:v 指定图片高质量，image_path 为图片输出路径，提取多个图片可用 path_%d 命名。
+
+采样频率 r 建议按照视频自身帧率来采。如视频15帧，而以30的帧频来采集图像，则两帧一重复。同理设置成15以下，采集出的图像数肯定小于总帧数。
+
+貌似 jpg 与 bmp 无明显差异，体积大小不同。理论上 jpg 更耗时，有圧缩过程。默认情况下，jpg 压缩率一般可达到 10.
+
+4K 视频图像尺寸 3840x2160，bmp可达到23-24M。
+
+
+
+2、编码视频
+
+FFmpeg  -i  image_path  -vcodec  code  -acodec  code  -r  fps  video_path
+
+该命令可以对规则命名的图片群进行编码，code 表示视频及音频编码方式， fps 为帧频
+
+-r，此处 r 据说是硬砍，不懂专业术语。建议 framerate 替代。
+
+不过貌似 ffmpeg 帧频限制在了 25，低于25时默认25.
+
+
+
+3、剪切视频
+
+FFmpeg  -ss  start_time  -t  last_time  -i  video_path   -vcodec  code  -acodec  code  -r  fps   video_path
+
+剪切视频命令与图片提取命令时间设置相似，编解码参数设置与编码视频命令设置相似
+
+
+
+4、连接视频
+
+windows系统与Linux系统操作略有差异，仅试了Windows系统。
+
+copy  /b  path_in1+path_in2+...+path_inN  path_all
+
+FFmpeg  -i  path_all  path_out
+
+Linux系统下貌似用cat命令，未测试
+
+cat  path_in1+path_in2+...+path_inN  path_all
+
+其中各子文件需要相同的格式，包括编码格式、帧频等。
+
+如果文件类型不同，可先FFmpeg处理一致。
+
+
+
+5、添加水印
+
+ffmpeg -i  inputvideo -vf "movie=1.jpg,scale=150:300[watermask];
+
+[in][watermask] overlay=100:100[out]" -y  outputvideo
+
+
+scale：水印大小，水印长度*水印的高度；
+
+overlay：水印的位置，距离屏幕左侧的距离＊距离屏幕上侧的距离；
+======================================================================================================
+ffmpeg参数设定解说
+ffmpeg.exe -i F:/娱乐/动力之歌.mp3 -ab 56 -ar 22050 -b 500 -r 15 -s 320x240 f:/11.flv
+ffmpeg -i F:/01.wmv -ab 56 -ar 22050 -b 500 -r 15 -s 320x240 f:/test.flv
+使用-ss参数 作用（time_off set the start time offset），可以从指定时间点开始转换任务。如:
+转换文件格式的同时抓缩微图：
+ffmpeg -i "test.avi" -y -f image2 -ss 8 -t 0.001 -s 350x240 'test.jpg'
+对已有flv抓图：
+ffmpeg -i "test.flv" -y -f image2 -ss 8 -t 0.001 -s 350x240 'test.jpg'
+-ss后跟的时间单位为秒
+Ffmpeg转换命令
+ffmpeg -y -i test.mpeg -bitexact -vcodec h263 -b 128 -r 15 -s 176x144 -acodec aac -ac 2 -ar 22500
+-ab 24 -f 3gp test.3gp
+或者
+ffmpeg -y -i test.mpeg -ac 1 -acodec amr_nb -ar 8000 -s 176x144 -b 128 -r 15 test.3gp
+ffmpeg参数设定解说 
+-bitexact 使用标准比特率 
+-vcodec xvid 使用xvid压缩 
+-s 320x240 指定分辨率 
+-r 29.97 桢速率（可以改，确认非标准桢率会导致音画不同步，所以只能设定为15或者29.97） 
+画面部分，选其一 
+-b <比特率> 指定压缩比特率，似乎ffmpeg是自动VBR的，指定了就大概是平均比特率，比如768，1500这样的
+就是原来默认项目中有的 
+-qscale <数值> 以<数值>质量为基础的VBR，取值0.01-255，约小质量越好 
+-qmin <数值> 设定最小质量，与-qmax（设定最大质量）共用，比如-qmin 10 -qmax 31 
+-sameq 使用和源同样的质量
+声音部分 
+-acodec aac 设定声音编码 
+-ac <数值> 设定声道数，1就是单声道，2就是立体声，转换单声道的TVrip可以用1（节省一半容量），高品质
+的DVDrip就可以用2 
+-ar <采样率> 设定声音采样率，PSP只认24000 
+-ab <比特率> 设定声音比特率，前面-ac设为立体声时要以一半比特率来设置，比如192kbps的就设成96，转换
+君默认比特率都较小，要听到较高品质声音的话建议设到160kbps（80）以上 
+-vol <百分比> 设定音量，某些DVDrip的AC3轨音量极小，转换时可以用这个提高音量，比如200就是原来的2倍
+这样，要得到一个高画质音质低容量的MP4的话，首先画面最好不要用固定比特率，而用VBR参数让程序自己去
+判断，而音质参数可以在原来的基础上提升一点，听起来要舒服很多，也不会太大（看情况调整
+例子：ffmpeg -y -i "1.avi" -title "Test" -vcodec xvid -s 368x208 -r 29.97 -b 1500 -acodec aac -ac 2 -ar 24000 -ab 128 -vol 200 -f psp -muxvb 768 "1.mp4"
+
+解释：以上命令可以在Dos命令行中输入，也可以创建到批处理文件中运行。不过，前提是：要在ffmpeg所在的目录中执行（转换君所在目录下面的cores子目录）。
+参数：
+-y（覆盖输出文件，即如果1.mp4文件已经存在的话，不经提示就覆盖掉了）
+-i "1.avi"（输入文件是和ffmpeg在同一目录下的1.avi文件，可以自己加路径，改名字）
+-title "Test"（在PSP中显示的影片的标题）
+-vcodec xvid（使用XVID编码压缩视频，不能改的）
+-s 368x208（输出的分辨率为368x208，注意片源一定要是16:9的不然会变形）
+-r 29.97（帧数，一般就用这个吧）
+-b 1500（视频数据流量，用-b xxxx的指令则使用固定码率，数字随便改，1500以上没效果；还可以用动态码率如：-qscale 4和-qscale 6，4的质量比6高）
+-acodec aac（音频编码用AAC）
+-ac 2（声道数1或2）
+-ar 24000（声音的采样频率，好像PSP只能支持24000Hz）
+-ab 128（音频数据流量，一般选择32、64、96、128）
+-vol 200（200%的音量，自己改）
+-f psp（输出psp专用格式）
+-muxvb 768（好像是给PSP机器识别的码率，一般选择384、512和768，我改成1500，PSP就说文件损坏了）
+"1.mp4"（输出文件名，也可以加路径改文件名）
+
+P.S. 版主机器强劲的话，可以多开几个批处理文件，让它们并行处理。
+E:/ffmpeg.exe -i I:/1.wmv -b 360 -r 25 -s 320x240 -hq -deinterlace -ab 56 -ar 22050 -ac 1 D:/2.flv
+posted @ 2008-12-06 17:11 王培 阅读(105) | 评论 (0) | 编辑
+ffmpeg和Mencoder使用实例小全
+下载电影的时候，我们总希望在全部下载完成之前能够预览一下影片内容，于是发布者时常会放一些影片截图在种子文件中，或者直接贴到网上，也有一些截图是一张图片，但包含很多幅影片在一起，就像下面这张：
+imagemagick-montage-sample
+
+有很多软件能够截取影片图像、合并图像，但如果影片太多，比如视频网站为用户上传的图像生成预览图之类的，人工在gui方式下操作就不可取了，我们需要在命令行方式下来截取、合并。
+
+首先，截取影片图像使用最多的就是mplayer或者ffmpeg，我用mplayer比较熟，本文就以此为例了，ffmpeg功能也是非常强大的，但据说支持的文件格式却不丰富。mplayer截取影片图像的基本命令为：
+
+mplayer -ss START_TIME -noframedrop -nosound -vo jpeg -frames N NAME_OF_VIDEO_FILE   
+上例中，-ss指定开始的时间，结合-frames参数，限定从某个时间开始、截取几帧图像。为了体现整个影片的内容，我需要在影片中间隔时间相同的几个点、每个点截取1帧图像，所以按道理应该用-frames 1，但是mplayer这样截图的情况下，第一帧似乎永远都会截取到一个黑屏，所以我常用-frames 2。截取下来的图像保存在了当前目录，名称从00000001.jpg开始依次递增，按照-frames 2，就是取00000002.jpg为结果，删除00000001.jpg即可。经过简单实验，在截取wmv、rmvb影片时，前面的好几帧都会是黑屏，也只能参考上面的做法多取几帧了。
+
+为了取影片中间隔大致相同的几个点，可以用-ss指定时间，也可以用-sb指定开始字节，在我的实际使用中，使用-sb只会得到黑屏，所以通过文件大小来设置间隔点的办法不行，只能用-ss时间间隔了，这就需要首先得到影片的总时间。好在mplayer为我们提供了类似的功能：
+
+mplayer -identify movie-filename -nosound -vc dummy -vo null   
+这样会输出一大堆影片信息，从中截取所需内容即可，在bash shell中，取得影片总时间长度（以秒为单位）的命令如下：
+
+FILESIZE=`mplayer -identify -nosound -vc dummy -vo null $1 | grep ID_LENGTH | sed -r 's/ID_LENGTH=([[:digit:]]*)(.[[:digit:]]*)?/1/g'`   
+有了影片的总时长，我们就可以根据所要截取的帧数，计算出每个间隔点的时间位移了。不过要注意一般影片的开始-ss 0和结束-ss TOTAL_TIME_OF_VIDEO截取下来都会是黑屏，在处理的时候要分别加上和减去若干秒。
+
+截取工作完成后，我们拥有了一堆000000xx.jpg文件，如果能把这些文件都放到一个文件中，每行2张，成为一张大图片，在发布的时候会很方便。所以，我们使用imagemagick(http://www.imagemagick.org/script/index.php)中的montage命令来实现：
+
+montage -geometry +0+0 -tile 2 *.jpg montage.jpg   
+-geometry +0+0是设定使用原始图片大小，-tile 2参数设定每行放2张图片，最后一个参数是要生成的目标文件名，现在，我们就能够得到像刚才那张一样的图片了。
+
+原理已经讲清楚了，可以自己写一个bash脚本来方便调用，我在网上找到了一个很不错的例子(http://www.linuxquestions.org/questions/showthread.php?t=361072)，可以在这个基础上进行修改，过程不再详述了。
+
+下面再列一些在网上找到的其他mplayer、mencoder、ffmpeg的使用实例：
+
+mplayer获取影片信息
+mplayer -identify movie-filename -nosound -vc dummy -vo null
+从所有输出中可以grep到如下信息：
+- filetype: ASF file format detected.
+- dimensions and format: VIDEO: [MP43] 320×240 24bpp 1000.000 fps 0.0 kbps ( 0.0 kbyte/s)
+- video format: ID_VIDEO_FORMAT=MP43
+- width (dimensions): ID_VIDEO_WIDTH=320
+- height (dimensions): ID_VIDEO_HEIGHT=240
+- length in seconds: ID_LENGTH=98.00
+参考8(http://gallery.menalto.com/node/40548)
+
+mencoder图片做成电影
+#用当前目录中的所有JPEG文件创建DivX4文件：
+mencoder *.jpg -mf on:w=800:h=600:fps=25 -ovc divx4 -o output.avi
+#用当前目录中的一些JPEG文件创建DivX4文件：
+mencoder -mf on:w=800:h=600:fps=25 -ovc divx4 -o output.avi *.jpg
+#用当前目录中的所有JPEG文件创建Motion JPEG(MJPEG)文件：
+mencoder -mf on:w=800:h=600:fps=25 -ovc copy -o output.avi *.jpg
+#用当前目录中的所有PNG文件创建一个非压缩的文件：
+mencoder -mf on:w=800:h=600:fps=25:type=png -ovc rawrgb -o output.avi *.png
+简单用法：
+mencoder *.jpg -mf on:fps=15 -o output.avi -ovc xvid
+参考6 参考7(http://huangjiahua.livejournal.com/99358.html)
+
+ffmpeg屏幕录像
+ffmpeg -vcodec mpeg4 -b 1000 -r 10 -g 300 -vd x11:0,0 -s 1024×768 ~/test.avi
+其中，-vd x11:0,0 指录制所使用的偏移为 x=0 和 y=0，-s 1024×768 指录制视频的大小为 1024×768。录制的视频文件为 test.avi，将保存到用户主目录中。其他选项可查阅其说明文档。
+如果你只想录制一个应用程序窗口或者桌面上的一个固定区域，那么可以指定偏移位置和区域大小。使用xwininfo -frame命令可以完成查找上述参数。
+你也可以重新调整视频尺寸大小，如：./ffmpeg -vcodec mpeg4 -b 1000 -r 10 -g 300 -i ~/test.avi -s 800×600 ~/test-800-600.avi。
+参考5(http://linuxtoy.org/archives/ffmpeg.html)
+
+mplayer对video进行截屏 截图(wmv mpeg mov flv all works)
+mplayer 78.mov -ss 1 -nosound -vo jpeg:outdir=./ -frames 2
+我截的第一张图不知为何全部都是黑屏
+参考4(http://www.linuxfans.org/nuke/modules.php?name=Forums&file=viewtopic&t=165254)
+
+转换为flv文件
+mencoder NOW.wmv -ffourcc FLV1 -of lavf -ovc lavc -lavcopts vcodec=flv:acodec=mp3:abitrate=56 -srate 22050 -oac mp3lame -o NOW.flv
+ffmpeg -i a.asf -ab 56 -ar 22050 -b 500 -r 15 -s 320×240 asf.flv
+参考3(http://www.roading.net/blog/article.asp?id=114)
+
+使用ffmpeg抓图
+ffmpeg -i test2.asf -y -f image2 -ss 08.010 -t 0.001 -s 352×240 b.jpg
+jpg: ffmpeg -i test.asf -y -f image2 -t 0.001 -s 352×240 -ss a.jpg //注意-ss就是要提取视频文件中指定时间的图像
+jpg: ffmpeg -i asf.flv -y -f image2 -t 1 asf.jpg
+gif: ffmpeg -i test.asf -vframes 30 -y -f gif a.gif
+参考3 参考2(http://www.killflash.net/blog/article.asp?id=77)
+
+如何合并几个视频片段
+mencoder -oac copy -ovc copy -idx -o output.avi video1.avi video2.avi video3.avi
+* 其中，-oac copy 选项告诉 mencoder 要正确拷贝音频流。而 -ovc copy 选项则是拷贝视频流。
+* 如果在视频文件中没有找到索引的话，那么 -idx 选项会要求 mencoder 建立它。
+* -o 选项指定输出文件的名称。
+* 最后几个参数为需要合并的几个视频片段。
+参考1 (http://linuxtoy.org/archives/join_several_videos.html)
+
+大杂烩
+服务器端转换工具(Server-Side-FLV-Conversion)
+场景:想把 MPG 或 AVI 上传到你的服务器并自动转换成 FLV 吗?
+1,FFmpeg (http://sourceforge.net/projects/ffmpeg) | 教程一 (http://soenkerohde.com/tutorials/ffmpeg) | 教程二 (http://klaus.geekserver.net/flash/streaming.html)(Google Video 使用的就是这个东东.)
+2,Flix Engine (http://www.on2.com/developer/flix-engine-sdk) | 教程 (http://www.flexauthority.com/articlesIndex.cfm) | 范例 (http://www.flexauthority.com/Samples/FlixEngine/index.html)
+3,Turbine Video Engine (http://www.blue-pacific.com/products/turbinevideosdk/default.htm)
+4,Video to Flash Console (http://www.geovid.com/Video_to_Flash_Console)
+
+录像/实时广播(Record/Broadcast)
+场景:想制作一个语音视频Blog满足自恋的欲望吗？
+1,RED5 (http://www.osflash.org/red5)
+2,Flash Media Server (http://www.macromedia.com/go/fms)
+在线编码,分享视频(Online Encode & Share)
+场景:想不花钱就可以在线分享你的视频吗?
+1,Google Video (http://video.google.com/)
+2,You Tube (http://www.youtube.com/)
+本地 FLV 文件播放器(FLV Player)
+场景:拿到了 FLV 文件不知道怎么播放了．
+1,martijndevisser FLV Player (http://www.martijndevisser.com/2005/10/flv_player_updated.html)
+2,FlashGuru FLV Player (http://www.flashguru.co.uk/free-tool-flash-video-player)
+3,FCZone FLV Player (http://fczone.com/2006/01/fms-media-player.cfm)
+在线 FLV 文件播放器(Online FLV Player)
+场景:知道一个在线FLV地址,又懒得下载和安装播放器．
+1,Loadr (http://dengjie.com/loadr)
+2,Google Player Generator (http://dengjie.com/loadr/r.swf?file=/temp/google_player.swf&clr=000FFF)
+更多相关软件看这篇文章:Flash 网站的视频策略 (http://www.macromedia.com/cfusion/knowledgebase/index.cfm?id=tn_14571)
+
+此文章转自 shadow
+
+ffmpeg 参数
+
+利用ffmpeg+mencoder视频转换的总结
+http://www.yitian130.com/article.asp?id=69
+
+flv视频转换和flash播放的解决方案笔记
+http://blog.verycd.com/dash/showentry=35982
+
+Youtube技术原理
+1. 网页文件允许上传视频文件（这个和上传其他文件一样的）（作者用的是python的架构）
+2. 后台调用ffmpeg对上传的视频进行压缩，输出flv格式的文件。这个开源程序win32和linux都有实现，所以可以适应不用的主机环境。
+3. 使用flvtools处理flv文件，标记上时长、帧速、关键帧等元数据，这样的flash文件才可以拖放。
+4. 使用 ffmpeg 产生flv文件的缩略，和大图像文件的缩略图是一个道理。
+5. 使用适当的flv播放器在网页中播放服务器端生成的flv文件。
+更多详细：http://www.gotonx.com/bbs/simple/index.php?t6322.html
+
+安装和使用ffmpeg转换视频为flv文件（windows和linux）
+
+1、环境winxp-sp2下：
+从 http://ffdshow.faireal.net/mirror/ffmpeg/ 下载
+最新版本的 FFMpeg.exe直接用就行（须rar解压）。
+
+以下的东西是为对ffmpeg无法解析的文件格式(wmv9，rm，rmvb等)转换用的,
+从http://mediacoder.sourceforge.net/download_zh.htm下载
+最新版本的mediacoder的安装后；找到其中的mencoder.exe；drv43260.dll和pncrt.dll三个文件。
+
+2、环境linuxas4。3下：
+
+a、先装mp3在linux下的包：lame-3.97.tar.gz；
+tar -xvzf lame-3.97.tar.gz;
+cd lame-3.97;
+//(默认是装在/usr/local下);
+//--prefix=/usr/此参数一定要(便于调用os的其它系统包)
+//--enable-shared此参数一定要
+./configure --enable-shared --prefix=/usr/;
+make;
+make install;
+
+b、支持3gp格式，这也是现在好多手机支持的格式，因为手机用户是我们的主要用户，所以也得支持编译
+
+编译的时候加上--enable-amr_nb --enable-amr_wb参数就行，根据编译系统的提示，所以我们得下载一些编译3gp所需得文件。
+
+wget http://www.3gpp.org/ftp/Specs/archive/26_series/26.204/26204-510.zip
+解压以后把里面的文件都拷贝到libavcodec/amrwb_float/
+
+wget http://www.3gpp.org/ftp/Specs/archive/26_series/26.104/26104-510.zip
+解压以后把里面的文件都拷贝到libavcodec/amr_float/
+
+c、mpg4 aac格式支持，由于服务器还针对手机用户服务，所以，类似aac，mpg4铃声格式的支持，我们也得做。这里我们安装faad2和faac就行
+下载请到http://www.audiocoding.com/modules/mydownloads/
+
+tar zxvf faad2-2.5.tar.gz
+cd faad2
+echo > plugins/Makefile.am
+echo > plugins/xmms/src/Makefile.am
+sed -i '/E_B/d' configure.in
+autoreconf -vif
+./configure --prefix=/usr
+make &&
+make install
+
+tar zxvf faac-1.25.tar.gz
+cd faac
+sed -i '/[2de].M/d' configure.in
+echo "AC_OUTPUT(common/Makefile common/mp4v2/Makefile libfaac/Makefile frontend/Makefile include/Makefile Makefile)" >> configure.in
+autoreconf -vif
+./configure --prefix=/usr
+make &&
+make install
+
+d、支持xvid; x264，现在最流行的两种高质量的压缩格式
+xvid的编译安装
+wget http://downloads.xvid.org/downloads/xvidcore-1.1.2.tar.gz
+tar zvxf xvidcore-1.1.2.tar.gz
+
+cd xvidcore-1.1.2/build/generic
+./configure --prefix=/usr --enable-shared
+make
+make install
+
+x264的获取同样是采用svn方式:
+svn co svn://svn.videolan.org/x264/trunk x264
+
+linux下须从http://www.kernel.org/pub/software/devel/nasm/binaries/linux/下载nasm-0.98.39-1.i386.rpm
+
+在linux下安装就行了。。。
+
+rpm -ivh nasm-0.98.39-1.i386.rpm（如-ivh不行就用-Uvh）
+
+cd x264
+./configure --prefix=/usr --enable-shared
+make
+make install
+
+e、安装ffmpeg:
+//as4.3系统已经支持ac3编码，只要加--enable-a52 --enable-gpl参数就行
+//我加--enable-shared参数没有成功
+./configure --prefix=/opt/ffmpeg/ --enable-mp3lame --enable-amr_nb --enable-amr_wb --enable-a52 --enable-xvid --enable-x264 --enable-faad --enable-faac --enable-gpl --enable-pthreads;
+make clean;//一定要；否则有可能没声音。
+make;
+make install;
+
+在相应windows和linux目录下（有ffmpeg文件的;以下用linux下说明）：
+3、使用ffmpeg转换视频为flv文件：
+./ffmpeg -i "/opt/input/1.mpg" -y -ab 32 -ar 22050 -b 800000 -s 640*480 /opt/output/1.flv"
+ffmpeg能解析的格式：（asx，asf，mpg，wmv，3gp，mp4，mov，avi，flv等）
+
+对ffmpeg无法解析的文件格式(wmv9，rm，rmvb等),
+可以先用别的工具（mencoder）转换为avi(ffmpeg能解析的)格式.
+./mencoder /input/a.rmvb -oac lavc -lavcopts acodec=mp3:abitrate=64 -ovc xvid -xvidencopts bitrate=600 -of avi -o /output/a.avi
+在执行./ffmpeg -i "/opt/input/a.avi" -y -ab 32 -ar 22050 -b 800000 -s 640*480 /opt/output/a.flv"就可以转了。
+
+4、视频抓图:
+./ffmpeg -i "/opt/input/a.flv" -y -f image2 -t 1 -s 300*200 "/opt/output/1.jpg" //获取静态图
+
+./ffmpeg -i "/opt/input/a.mpg" -vframes 30 -y -f gif "/output/1.gif" //获取动态图;
+不提倡抓gif文件；因为抓出的gif文件大而播放不流畅。
+
+用mencoder在线转换视频格式并控制视频品质
+http://blog.sina.com.cn/u/490343a7010006z6
+
+posted @ 2008-12-06 17:10 王培 阅读(93) | 评论 (0) | 编辑
+FLV视频转换的利器 - ffmpeg.exe
+FLV视频转换的利器 - ffmpeg.exe
+文章1：
+大家应该都知道Youtobe、Google Video之类视频分享网站。他们的视频全部是使用Flash播放，而通过探索实际地址，会发现下载回来的东西都是Flash支持的FLV格式。这种格式的视频，播放和转换是非常麻烦的。但是，有一个源于Linux的工具软件ffmpeg可以轻易地实现FLV向其它格式（avi(mpeg4)、asf、mpeg）的转换或者将其它格式转换为flv。 =OD 'GuQ 
+ffmpeg作为Linux下的LGPL开源程序，在Windows下编译需要特殊的工具。我这里提供的ffmpeg.exe是2004年的旧版本，使用MinGW编译，只有一个可执行文件,可直接运行（命令行程序）。 b< td|kk 
+FLV向其它格式（avi(mpeg4)、asf、mpeg）转换的简易方法：（圆括号内必填，方括号内可选） khOG Kh * 
+转换成wmv/asf JZvQCf ; $ 
+ffmpeg -i (要转换的flv文件完整路径) -f asf -vcodec (wmv1或wmv2) [-b 视频码率] -acodec mp3 [-ab 音频码率] (输出的asf/wmv文件完整路径） !.C 1 } Wf 
+转换成mpeg1 n X a Os& 
+ffmpeg -i (要转换的flv文件完整路径) -f mpeg -vcodec mpeg1video [-b 视频码率] -acodec mp2 [-ab 音频码率] (输出的mpg文件完整路径） =mmB jG}0{ 
+转换成avi（msmpeg4） z4%EYCZ' 
+ffmpeg -i (要转换的flv文件完整路径) -f avi -vcodec (msmpeg4或msmpeg4v1或msmpeg4v2) [-b 视频码率] -acodec mp3 [-ab 音频码率] (输出的avi文件完整路径） AImbK hOK' 
+8J} `s07 
+其它格式向flv转换的简易办法 q f1975fI 
+ffmpeg -i （输入的文件完整路径，RM/RMVB不支持，最好是mpeg4的AVI或者MPEG1文件，对新版的wmv支持不好）-f flv -vcodec flv [-b 视频码率] -acodec mp3 [-ab 音频码率] （输出的flv文件) P 'P#Kl 
+/Wu3)RjK 
+ffmpeg其实还有很多选项。说明文件全部嵌在代码里了。 C(V+E j*!" 
+下载：ffmpeg.zip v - d5$ +O 
+http://freehost25.websamba.com/yksoft/download/ffmpeg.zip (%& "f_5q 
+附：flv播放器 S/99 i*X0H 
+http://freehost25.websamba.com/yksoft/download/rivaflvplayer.zip
+ 
+
+ 
+
+ 
+
+文章2：
+
+最近完成了这个小Demo,来分享一下!
+上面给了我两天时间,来完成这个小功能
+于时我花了半天时间从网络上到处鄱资料,又花了半天时间调试代码,成功之后,终于有了以下一点的经验之谈:
+
+这里讲一下重要的:
+1.用到两个工具,一个是ffmpeg.exe,另一个是mencoder.exe
+ffmpeg最新版本的下载地址：http://ffdshow.faireal.net/mirror/ffmpeg/
+Mencoder新版本的下载地址：http://www5.mplayerhq.hu/MPlayer/releases/win32/
+
+这里有一个重点,网上的文章都没讲到,所以造成有些人运行后没反应,原因是上面路径的下载,有很多版本,不同的版本可能个别参数不同,而网上的文章所用的参数都是用很早的版本写的,所以会造成运行后因参数错误而没有效果
+简单处理是:把网上参数在cmd命令行执行一下,这时命令行会报哪个参数错误,把它删了即可!
+
+2.判断处理成功与失败或是进度是否完成,从异步获取的输出信息判断[包括获取原视频的宽与高]
+这里重点在两个委托事件中,详情见以下几行代码
+
+private  void StartProcess(string tool)
+3          {
+4              StartProcess(tool, false);
+5          }
+6         private  void StartProcess(string tool,bool onlyCheckInfo)
+7          {
+8              System.Diagnostics.Process p = new System.Diagnostics.Process();
+9              p.StartInfo.FileName = tool;
+10              p.StartInfo.Arguments = commandPara;
+11              p.StartInfo.UseShellExecute = false;
+12              p.StartInfo.RedirectStandardInput = true;
+13              p.StartInfo.RedirectStandardOutput = true;
+14              p.StartInfo.RedirectStandardError = true;
+15              p.StartInfo.CreateNoWindow = false;
+16              p.OutputDataReceived += newSystem.Diagnostics.DataReceivedEventHandler(p_OutputDataReceived);
+17             if (onlyCheckInfo)//只检测文件是否可转换与获到内部宽与高
+18              {
+19                  p.ErrorDataReceived += newSystem.Diagnostics.DataReceivedEventHandler(p_CheckInfoDataReceived);
+20              }
+21             else
+22              {
+23                  p.ErrorDataReceived += newSystem.Diagnostics.DataReceivedEventHandler(p_ErrorDataReceived);
+24              }
+25             //开始执行 
+26             try
+27              {
+28                  p.Start();
+29                  p.BeginOutputReadLine();
+30                  p.BeginErrorReadLine();
+31                  p.WaitForExit();
+32              }
+33             catch (Exception err)
+34              {
+35                  Console.WriteLine(err.Message);
+36              }
+37             finally
+38              {
+39                  p.Close();
+40              }
+41          }
+42         void p_CheckInfoDataReceived(object sender, System.Diagnostics.DataReceivedEventArgs e)
+43          {
+44             if (!string.IsNullOrEmpty(e.Data))
+45              {
+46                 if (e.Data.Contains("Stream") && e.Data.Contains("Video:"))//设置原视频窗口大小作为flv视频的宽与高
+47                  {
+48                      Match match = Regex.Match(e.Data, @", (/d+)x(/d+)");
+49                     if (match != null)
+50                      {
+51                          videoWidth = match.Groups[1].Value;
+52                          videoHeight = match.Groups[2].Value;
+53                      }
+54                  }
+55                 else if (e.Data.Contains("could not find codec parameters"))//ffmpeg转换失败
+56                  {
+57                      isCanChangeToFlv = false;
+58                      Program.SetDataBase(id, 1, count + 1);
+59                  }
+60              }
+61 
+62          }
+63 
+64          void p_ErrorDataReceived(object sender, System.Diagnostics.DataReceivedEventArgs e)
+65          {
+66             if (!string.IsNullOrEmpty(e.Data))
+67              {
+68                 if (e.Data.Contains("video:") && e.Data.Contains("muxing overhead"))//ffmpeg转换完成
+69                  {
+70                      Program.SetDataBase(id, 2, count + 1);
+71                      Console.WriteLine("转换完成");
+72                  }
+73                  Console.WriteLine(e.Data);
+74              }
+75             
+76          }
+77 
+78          void p_OutputDataReceived(object sender, System.Diagnostics.DataReceivedEventArgs e)
+79          {
+80             if (!string.IsNullOrEmpty(e.Data))
+81              {
+82                 if (e.Data.Contains("Writing index"))//mencoder转换完成
+83                  {
+84                      Program.SetDataBase(id, 2, count + 1);
+85                      Console.WriteLine("转换完成");
+86                  }
+87                 //else if (e.Data.Contains("Exiting"))//mencoder转换失败
+88                 //{
+89                 //     Console.WriteLine("转换失败");
+90                 //}
+91                  Console.WriteLine(e.Data);
+92              }
+93          }
+94 
+95
+
+ 
+
+
+本文只讲重点,请结合网络其它文章与本文即可!
+
+ 
+
+文章3：
+
+Youtube的成功，使得国内的视频网站如雨后春笋般的冒出来，前不久朋友叫我帮他写一个将各种视频格式转换成flv的程序，这里就将编写程序遇到困难和获得的经验拿出来和大家分享一下。 1、使用引擎：ffmpeg + Mencoder 2、ffmpeg最新版本的下载地址：http://ffdshow.faireal.net/mirror/ffmpeg/ Mencoder新版本的下载地址：http://www5.mplayerhq.hu/MPlayer/releases/win32/ 3、转换速度比较：总体上ffmpeg转换的速度快于Mencoder 4、转换格式要求：rm、rmvb、r
+
+Youtube的成功，使得国内的视频网站如雨后春笋般的冒出来，前不久朋友叫我帮他写一个将各种视频格式转换成flv的程序，这里就将编写程序遇到困难和获得的经验拿出来和大家分享一下。
+
+1、使用引擎：ffmpeg + Mencoder
+2、ffmpeg最新版本的下载地址：http://ffdshow.faireal.net/mirror/ffmpeg/
+Mencoder新版本的下载地址：http://www5.mplayerhq.hu/MPlayer/releases/win32/
+3、转换速度比较：总体上ffmpeg转换的速度快于Mencoder
+4、转换格式要求：rm、rmvb、rt格式的文件只能用Mencoder转换，出于速度考虑我基本上都用ffmpeg转换，所以Mencoder能转换的格式我没有详细测试（哪个朋友知道，麻烦你告诉我下，我补充上去）。
+5、纯音频格式只能用Mencoder进行转换。如何判断是否是纯音频格式可以通过使用命令 FFmpeg -i "文件的完整路径" 获得输出后就可以分析出来。
+6、.mov格式的用ffmpeg转换出来的效果比较差，建议用Mencoder进行转换，wmv8用ffmpeg经常会有花屏产生建议用Mencoder。
+7、视频按比率输出的问题：必须先获取源视频文件的宽度和高度（也是通过 FFmpeg -i "文件的完整路径" 获得输出后就可以分析出来）根据这个高度和宽度的比率来设定输出文件的尺寸。
+8、可能的难点：因为这ffmpeg 和 Mencoder都是命令行工具（当然你也可以下载源代码自己修改成com之类的），在C＃只能用Process调用，前面我提过要获得输出信息（获取视频相关信息、获取当前的转换进度、获取什么时候完成转换），必须设置process.StartInfo.UseShellExecute = false; process.StartInfo.CreateNoWindow = true;然后必须通过异步编程的方式获取Process.StandardOutput和Process.StandardError的值，相关说明可以见（ms-help://MS.MSDNQTR.2003FEB.2052/cpref/html/frlrfSystemDiagnosticsProcessClassStandardOutputTopic.htm）（必须安装了msdn的才能看）。
+
+本文旨在帮助大家少走一些弯路，并不提供实际的解决方案及相关的源码下载。
+======================================================================================================
+C# 使用 ffmpeg 进行音频转码
+2017年06月27日 23:31:08 Dandelion_drq 阅读数：2030
+版权声明：本文为博主原创文章，未经博主允许不得转载。	https://blog.csdn.net/Dandelion_drq/article/details/73824886
+先放一下 ffmpeg 的官方文档以及下载地址： 
+官方文档：http://ffmpeg.org/ffmpeg.html 
+下载地址：http://ffmpeg.org/download.html
+
+用 ffmpeg 进行转码很简单，全部都用默认参数的话用下面这句就行：
+
+ffmpeg.exe -i D:\test\1.aac -y D:\test\1.mp3    -- 1.aac是要转码的输入文件，1.mp3是输出文件，-y是覆盖输出文件的意思
+1
+当然 ffmpeg 支持很多参数，比如使用什么编码器，指定码率等等……这里就不详细说了（关键是我也不懂hhh）
+
+了解了这个强大的工具怎么用之后，就是在 C# 里怎么用它啦~~
+
+也很简单，用 Process 启动一个进程去调用 ffmpeg 就好了。
+
+直接上代码，我写了一个控制台程序，接收两个参数，分别是输入文件和输出文件（都是绝对路径），然后调用 ffmpeg 进行转码，最终完成转码并输出相应操作信息。
+
+using System;
+using System.Diagnostics;
+
+namespace AudioTranscoding
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            Process process = new Process();
+
+            try
+            {
+                if (args.Length != 2)
+                {
+                    Console.WriteLine("参数不合法");
+                    return;
+                }
+
+                string inputFile = args[0];
+                string outputFile = args[1];
+
+                process.StartInfo.FileName = "ffmpeg.exe";  // 这里也可以指定ffmpeg的绝对路径
+                process.StartInfo.Arguments = " -i " + inputFile + " -y " + outputFile;
+                process.StartInfo.UseShellExecute = false;
+                process.StartInfo.CreateNoWindow = true;
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.RedirectStandardInput = true;
+                process.StartInfo.RedirectStandardError = true;
+                process.ErrorDataReceived += new DataReceivedEventHandler(Output);  // 捕捉ffmpeg.exe的错误信息
+
+                DateTime beginTime = DateTime.Now;
+
+                process.Start();
+                process.BeginErrorReadLine();   // 开始异步读取
+
+                Console.WriteLine("\n开始音频转码...\n");
+
+                process.WaitForExit();    // 等待转码完成
+
+                if (process.ExitCode == 0)
+                {
+                    int exitCode = process.ExitCode;
+                    DateTime endTime = DateTime.Now;
+                    TimeSpan t = endTime - beginTime;
+                    double seconds = t.TotalSeconds;
+                    Console.WriteLine("\n转码完成！总共用时：" + seconds + "秒\n");
+                }
+                // ffmpeg.exe 发生错误
+                else
+                {
+                    Console.WriteLine("\nffmpeg.exe 程序发生错误，转码失败！");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("\n错误！！" + ex.ToString());
+            }
+            finally
+            {
+                process.Close();
+            }
+        }
+
+        private static void Output(object sendProcess, DataReceivedEventArgs output)
+        {
+            Process p = sendProcess as Process;
+            if (p.HasExited && p.ExitCode == 1) // 在ffmpeg发生错误的时候才输出信息
+            {
+                Console.WriteLine(output.Data);
+            }
+        }
+    }
+}
+======================================================================================================
+FFmpeg获取DirectShow设备数据（摄像头，录屏）
+这两天研究了FFmpeg获取DirectShow设备数据的方法，在此简单记录一下以作备忘。本文所述的方法主要是对应Windows平台的。
+
+1.       列设备
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -list_devices true -f dshow -i dummy  
+命令执行后输出的结果如下（注：中文的设备会出现乱码的情况）。列表显示设备的名称很重要，输入的时候都是使用“-f dshow -i video="{设备名}"”的方式。
+
+
+我自己的机器上列出了以下设备：
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+[dshow @0388f5e0] DirectShow video devices  
+[dshow @0388f5e0]  "Integrated Camera"  
+[dshow @0388f5e0] "screen-capture-recorder"  
+[dshow @0388f5e0] DirectShow audio devices  
+[dshow @0388f5e0]  "鍐呰楹﹀厠椋?(Conexant20672 SmartAudi"  
+[dshow @0388f5e0]  "virtual-audio-capturer"  
+下文的测试中，使用其中的两个视频输入："Integrated Camera"和"screen-capture-recorder"。
+
+ 注：音频设备出现乱码，这个问题的解决方法会随后提到。
+
+2.       获取摄像头数据（保存为本地文件或者发送实时流）
+2.1. 编码为H.264，保存为本地文件
+下面这条命令，实现了从摄像头读取数据并编码为H.264，最后保存成mycamera.mkv。
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="Integrated Camera" -vcodec libx264 mycamera.mkv  
+2.2. 直接播放摄像头的数据
+使用ffplay可以直接播放摄像头的数据，命令如下：
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffplay -f dshow -i video="Integrated Camera"  
+如果设备名称正确的话，会直接打开本机的摄像头，如图所示。
+
+
+注：除了使用DirectShow作为输入外，使用VFW也可以读取到摄像头的数据，例如下述命令可以播放摄像头数据：
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffplay -f vfwcap -i 0  
+此外，可以使用FFmpeg的list_options查看设备的选项：
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -list_options true -f dshow -i video="Integrated Camera"  
+
+输出如下：
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+[dshow @ 03845420] DirectShow video device options  
+[dshow @ 03845420]  Pin "鎹曡幏"  
+[dshow @ 03845420]   pixel_format=bgr24  min s=640x480 fps=15 max s=640x480 fps=30  
+[dshow @ 03845420]   pixel_format=bgr24  min s=640x360 fps=15 max s=640x360 fps=30  
+[dshow @ 03845420]   pixel_format=bgr24  min s=352x288 fps=15 max s=352x288 fps=30  
+[dshow @ 03845420]   pixel_format=bgr24  min s=320x240 fps=15 max s=320x240 fps=30  
+[dshow @ 03845420]   pixel_format=bgr24  min s=800x448 fps=1 max s=800x448 fps=15  
+[dshow @ 03845420]   pixel_format=bgr24  min s=960x544 fps=1 max s=960x544 fps=10  
+[dshow @ 03845420]   pixel_format=bgr24  min s=1280x720 fps=1 max s=1280x720 fps=10  
+[dshow @ 03845420]   pixel_format=bgr24  min s=424x240 fps=15 max s=424x240 fps=30  
+[dshow @ 03845420]   pixel_format=yuyv422  min s=640x480 fps=15 max s=640x480 fps=30  
+[dshow @ 03845420]   pixel_format=yuyv422  min s=640x360 fps=15 max s=640x360 fps=30  
+[dshow @ 03845420]   pixel_format=yuyv422  min s=352x288 fps=15 max s=352x288 fps=30  
+[dshow @ 03845420]   pixel_format=yuyv422  min s=320x240 fps=15 max s=320x240 fps=30  
+[dshow @ 03845420]   pixel_format=yuyv422  min s=800x448 fps=1 max s=800x448 fps=15  
+[dshow @ 03845420]   pixel_format=yuyv422  min s=960x544 fps=1 max s=960x544 fps=10  
+[dshow @ 03845420]   pixel_format=yuyv422  min s=1280x720 fps=1 max s=1280x720 fps=10  
+[dshow @ 03845420]   pixel_format=yuyv422  min s=424x240 fps=15 max s=424x240 fps=30  
+[dshow @ 03845420]   vcodec=mjpeg  min s=640x480 fps=15 max s=640x480 fps=30  
+[dshow @ 03845420]   vcodec=mjpeg  min s=640x360 fps=15 max s=640x360 fps=30  
+[dshow @ 03845420]   vcodec=mjpeg  min s=352x288 fps=15 max s=352x288 fps=30  
+[dshow @ 03845420]   vcodec=mjpeg  min s=320x240 fps=15 max s=320x240 fps=30  
+[dshow @ 03845420]   vcodec=mjpeg  min s=800x448 fps=15 max s=800x448 fps=30  
+[dshow @ 03845420]   vcodec=mjpeg  min s=960x544 fps=15 max s=960x544 fps=30  
+[dshow @ 03845420]   vcodec=mjpeg  min s=1280x720 fps=15 max s=1280x720 fps=30  
+
+可以通过输出信息设置摄像头的参数。
+
+例如，设置摄像头分辨率为1280x720
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffplay -s 1280x720 -f dshow -i video="Integrated Camera"  
+设置分辨率为424x240
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffplay -s 424x240 -f dshow -i video="Integrated Camera"  
+
+2.3. 编码为H.264，发布UDP
+下面这条命令，实现了：获取摄像头数据->编码为H.264->封装为UDP并发送至组播地址。
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="Integrated Camera" -vcodec libx264 -preset:v ultrafast -tune:v zerolatency -f h264 udp://233.233.233.223:6666  
+注1：考虑到提高libx264的编码速度，添加了-preset:v ultrafast和-tune:v zerolatency两个选项。
+
+注2：高分辨率的情况下，使用UDP可能出现丢包的情况。为了避免这种情况，可以添加–s 参数（例如-s 320x240）调小分辨率。
+
+2.4. 编码为H.264，发布RTP
+下面这条命令，实现了：获取摄像头数据->编码为H.264->封装为RTP并发送至组播地址。
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="Integrated Camera" -vcodec libx264 -preset:v ultrafast -tune:v zerolatency -f rtp rtp://233.233.233.223:6666>test.sdp  
+注1：考虑到提高libx264的编码速度，添加了-preset:v ultrafast和-tune:v zerolatency两个选项。
+
+注2：结尾添加“>test.sdp”可以在发布的同时生成sdp文件。该文件可以用于该视频流的播放。
+
+2.5. 编码为H.264，发布RTMP
+下面这条命令，实现了：获取摄像头数据->编码为H.264->并发送至RTMP服务器。
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="Integrated Camera" -vcodec libx264 -preset:v ultrafast -tune:v zerolatency -f flv rtmp://localhost/oflaDemo/livestream  
+
+2.6. 编码为MPEG2，发布UDP
+与编码为H.264类似，指明-vcodec即可。
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="Integrated Camera" -vcodec mpeg2video -f mpeg2video udp://233.233.233.223:6666  
+
+播放MPEG2的UDP流如下。指明-vcodec为mpeg2video即可
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffplay -vcodec mpeg2video udp://233.233.233.223:6666  
+ 
+
+3.       屏幕录制（Windows平台下保存为本地文件或者发送实时流）
+Linux下使用FFmpeg进行屏幕录制相对比较方便，可以使用x11grab，使用如下的命令：
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f x11grab -s 1600x900 -r 50 -vcodec libx264 –preset:v ultrafast –tune:v zerolatency -crf 18 -f mpegts udp://localhost:1234  
+详细时使用方式可以参考这篇文章：DesktopStreaming With FFmpeg for Lower Latency
+
+Linux录屏在这里不再赘述。在Windows平台下屏幕录像则要稍微复杂一些。在Windows平台下，使用-dshow取代x11grab。一句话介绍：注册录屏dshow滤镜（例如screen-capture-recorder），然后通过dshow获取录屏图像然后编码处理。
+
+因此，在使用FFmpeg屏幕录像之前，需要先安装dshow滤镜。在这里推荐一个软件：screen capture recorder。安装这个软件之后，就可以通过FFmpeg屏幕录像了。
+
+ 
+
+screen capture recorder项目主页：
+
+http://sourceforge.net/projects/screencapturer/
+
+下载地址：
+
+http://sourceforge.net/projects/screencapturer/files
+
+下载完后，一路“Next”即可安装完毕。注意，需要Java运行环境（Java Runtime Environment），如果没有的话下载一个就行。
+
+screen capture recorder本身就可以录屏，不过这里我们使用FFmpeg进行录屏。
+
+
+3.1. 编码为H.264，保存为本地文件
+下面的命令可以将屏幕录制后编码为H.264并保存为本地文件。
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="screen-capture-recorder" -r 5 -vcodec libx264 -preset:v ultrafast -tune:v zerolatency MyDesktop.mkv  
+注：“-r 5”的意思是把帧率设置成5。         
+
+最后得到的效果如下图。
+
+
+此外，也可以录声音，声音输入可以分成两种：一种是真人说话的声音，通过话筒输入；一种是虚拟的声音，即录屏的时候电脑耳机里的声音。下面两条命令可以分别录制话筒的声音和电脑耳机里的声音。
+
+录屏，伴随话筒输入的声音
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="screen-capture-recorder" -f dshow -i audio="鍐呰楹﹀厠椋?(Conexant 20672 SmartAudi" -r 5 -vcodec libx264 -preset:v ultrafast -tune:v zerolatency -acodec libmp3lame MyDesktop.mkv  
+上述命令有问题：audio那里有乱码，把乱码ANSI转UTF-8之后，开始测试不行，后来发现是自己疏忽大意，乱码部分转码后为“内装麦克风 ”，然后接可以正常使用了。因此，命令应该如下图所示：
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="screen-capture-recorder" -f dshow -i audio="内装麦克风 (Conexant 20672 SmartAudi" -r 5 -vcodec libx264 -preset:v ultrafast -tune:v zerolatency -acodec libmp3lame MyDesktop.mkv  
+注：
+如果不熟悉ANSI转码UTF-8的话，还有一种更简单的方式查看设备的名称。即不使用FFmpeg查看系统DirectShow输入设备的名称，而使用DirectShow SDK自带的工具GraphEdit（或者网上下一个GraphStudioNext）查看输入名称。
+
+打开GraphEdit选择“图像->插入滤镜”
+
+
+然后就可以通过查看Audio Capture Sources来查看音频输入设备的简体中文名称了。从图中可以看出是“内装麦克风 (Conexant 20672 SmartAudi”。
+
+
+PS：感觉这条命令适合做讲座之类的时候使用
+
+ 
+
+录屏，伴随耳机输入的声音
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="screen-capture-recorder" -f dshow -i audio="virtual-audio-capturer" -r 5 -vcodec libx264 -preset:v ultrafast -tune:v zerolatency -acodec libmp3lame MyDesktop.mkv  
+PS：测这条命令的时候，这在听歌，因此录制的视频中的音频就是那首歌曲。
+
+ 
+
+3.2. 编码为H.264，发布UDP
+下面的命令可以将屏幕录制后编码为H.264并封装成UDP发送到组播地址
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="screen-capture-recorder" -r 5 -vcodec libx264 -preset:v ultrafast -tune:v zerolatency -f h264 udp://233.233.233.223:6666  
+注1：考虑到提高libx264的编码速度，添加了-preset:v ultrafast和-tune:v zerolatency两个选项。
+
+注2：高分辨率的情况下，使用UDP可能出现丢包的情况。为了避免这种情况，可以添加–s 参数（例如-s 320x240）调小分辨率。
+
+3.3. 编码为H.264，发布RTP
+下面的命令可以将屏幕录制后编码为H.264并封装成RTP并发送到组播地址
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="screen-capture-recorder" -vcodec libx264 -preset:v ultrafast -tune:v zerolatency -f rtp rtp://233.233.233.223:6666>test.sdp  
+注1：考虑到提高libx264的编码速度，添加了-preset:v ultrafast和-tune:v zerolatency两个选项。
+
+注2：结尾添加“>test.sdp”可以在发布的同时生成sdp文件。该文件可以用于该视频流的播放。如下命令即可播放：
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffplay test.sdp  
+3.4. 编码为H.264，发布RTMP
+原理同上，不再赘述。
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg -f dshow -i video="Integrated Camera" -vcodec libx264 -preset:v ultrafast -tune:v zerolatency -f flv rtmp://localhost/oflaDemo/livestream  
+注意：播放RTMP的时候，-max_delay参数会比较明显的影响延迟，将此参数值设定小一些，有利于降低延时。
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffplay -max_delay 100000 "rtmp://localhost/oflaDemo/livestream live=1"  
+
+4.另一种屏幕录制的方式（2014.10.1更新）
+最近发现FFmpeg还有一个专门用于Windows下屏幕录制的设备：gdigrab。
+gdigrab是基于GDI的抓屏设备，可以用于抓取屏幕的特定区域。在这里记录一下gdigrab的用法。
+gdigrab通过设定不同的输入URL，支持两种方式的屏幕抓取：
+（1）“desktop”：抓取整张桌面。或者抓取桌面中的一个特定的区域。
+（2）“title={窗口名称}”：抓取屏幕中特定的一个窗口。
+下面举几个例子。
+最简单的抓屏：
+[plain] view plaincopy 
+ffmpeg -f gdigrab -i desktop out.mpg  
+
+从屏幕的（10,20）点处开始，抓取640x480的屏幕，设定帧率为5
+[plain] view plaincopy 
+ffmpeg -f gdigrab -framerate 5 -offset_x 10 -offset_y 20 -video_size 640x480 -i desktop out.mpg 
+
+一、Windows下面编译ffmpeg
+
+首先需要解决的问题是：在windows下面编译 ffmpeg， 并让其支持dshow， 本人把ffmpeg编译成功了， 但是编译出来的ffmpeg不支持dshow， 在网上找了有文章介绍如何编译ffmpeg让其支持dhsow， 按照文章说的方法试了N次， 终究没有成功。无奈只有找现成的windows下面的exe了。
+
+在这里找到了可用的ffmpeg.exe， 测试了一下，支持dshow。
+
+下载地址为：  http://ffmpeg.zeranoe.com/builds/
+请下载适合自己操作系统的压缩包， 我的系统是Win7 64Bit 的，所以选择的是  http://ffmpeg.zeranoe.com/builds/win64/static/ffmpeg-20130809-git-3b2e99f-win64-static.7z
+下载解压到C盘根目录。
+
+
+二、测试FFMPEG支持dshow的情况
+
+原文出处请参考 ：http://ffmpeg.org/trac/ffmpeg/wiki/DirectShow
+执行下面的命令 ， 即可显示你的系统支持音频捕获设备，视频捕获设备：
+
+[plain] view plaincopy 
+c:\> ffmpeg -list_devices true -f dshow -i dummy  
+ffmpeg version N-45279-g6b86dd5... --enable-runtime-cpudetect  
+  libavutil      51. 74.100 / 51. 74.100  
+  libavcodec     54. 65.100 / 54. 65.100  
+  libavformat    54. 31.100 / 54. 31.100  
+  libavdevice    54.  3.100 / 54.  3.100  
+  libavfilter     3. 19.102 /  3. 19.102  
+  libswscale      2.  1.101 /  2.  1.101  
+  libswresample   0. 16.100 /  0. 16.100  
+[dshow @ 03ACF580] DirectShow video devices  
+[dshow @ 03ACF580]  "Integrated Camera"  
+[dshow @ 03ACF580]  "screen-capture-recorder"  
+[dshow @ 03ACF580] DirectShow audio devices  
+[dshow @ 03ACF580]  "Internal Microphone (Conexant 2"  
+[dshow @ 03ACF580]  "virtual-audio-capturer"  
+dummy: Immediate exit requested  
+
+我们下来使用 视频捕获设备 "Integraged Camera" 保存为MP4文件：
+[plain] view plaincopy 
+c:\> ffmpeg -f dshow -i video="Integrated Camera" out.mp4  
+
+嘿嘿，摄像头灯亮了，文件已经输出到了和 ffmpeg.exe 相同的路径下面。 用VLC播放 out.mp4文件，正常。
+用下面的命令可以查看视频捕获设备支持的图片大小等详细信息。
+[plain] view plaincopy 
+C:\ffmpeg\bin>ffmpeg -f dshow -list_options true -i video="Integrated Camera"  
+用下面的命令我们可以把视频分辨率存储为1280x720,  FPS为15帧/秒， 输出为 out.avi 文件。是不是很方便啊 ？
+[plain] view plaincopy 
+C:\>ffmpeg -f dshow -s 1280x720 -r 15 -vcodec mjpeg -i video="Integrated Camera" out.avi   
+
+
+三、测试FFMPEG对DSHOW支持的另外一种方法
+原文出处 ： http://ffmpeg.org/trac/ffmpeg/wiki/How%20to%20capture%20a%20webcam%20input
+用下面的命令我们也可以输出视频捕获设备，只不过不是名字，而是ID的形式。
+
+[plain] view plaincopy 
+ffmpeg -y -f vfwcap -i list  
+输出如下 ：
+[plain] view plaincopy 
+  libavutil      52. 41.100 / 52. 41.100  
+  libavcodec     55. 24.100 / 55. 24.100  
+  libavformat    55. 13.102 / 55. 13.102  
+  libavdevice    55.  3.100 / 55.  3.100  
+  libavfilter     3. 82.100 /  3. 82.100  
+  libswscale      2.  4.100 /  2.  4.100  
+  libswresample   0. 17.103 /  0. 17.103  
+  libpostproc    52.  3.100 / 52.  3.100  
+[vfwcap @ 000000000034d940] Driver 0  
+[vfwcap @ 000000000034d940]  Microsoft WDM Image Capture (Win32)  
+[vfwcap @ 000000000034d940]  Version:  6.1.7600.16385  
+list: Input/output error  
+
+从上面看出 vfwcap的索引号为0， 用下面的命令即可捕获视频数据。其中 -i 0 就代表使用ID为0的视频采集设备， -r 25代表帧率为25帧/秒
+[plain] view plaincopy 
+ffmpeg -y -f vfwcap -r 25 -i 0 out.mp4  
+
+四、Apple公司的HLS文件切片相关资料
+
+原文出处为 ： http://orfika.net/src/mpegts-segmenter/
+
+
+下面是相关的技术资料的地址 ：
+MPEG TS segmenter by Chase Douglas source: http://svn.assembla.com/svn/legend/segmenter/
+ffmpeg & segmenter LiveStream Howto:       http://www.ioncannon.net/programming/452/iphone-http-streaming-with-ffmpeg-and-an-open-source-segmenter/
+Apple's LiveStream docs:                   https://developer.apple.com/library/ios/#documentation/NetworkingInternet/Conceptual/StreamingMediaGuide/Introduction/Introduction.html
+Apple's LiveStream draft at IETF:          http://tools.ietf.org/html/draft-pantos-http-live-streaming-07"
+ffmpeg 0.10.0 release:                     http://ffmpeg.org/download.html#release_0.10
+Cardon McDonal's IOCANNON:                 http://www.ioncannon.net/
+Index of /src/mpegts-segmenter/
+Name	Last Modified	Size	Type
+Parent Directory/	 	-  	Directory
+mpegts-segmenter.diff	2012-Feb-07 10:13:38	5.7K	application/octet-stream
+mpegts-segmenter.spec	2012-Feb-07 10:13:38	0.9K	application/octet-stream
+mpegts-segmenter.tar.gz	2012-Feb-07 10:13:38	9.9K	application/octet-stream
+还附带文件切片源码。
+下面的地址也可以下载 切片工具的源码，这个工具可能比较完善一点吧。
+https://github.com/johnf/m3u8-segmenter  这个是C的切片工具
+https://github.com/streamio/streamio-ffmpeg   这个是ruby语言写的转码和切片
+
+
+五、用FFMPEG实现iPhone的HTTP Stream技术步骤
+原文出处 ：http://www.ioncannon.net/programming/452/iphone-http-streaming-with-ffmpeg-and-an-open-source-segmenter/
+
+Step 1: 获取最新版本的 FFMpeg
+The FFMpeg download page  从该地址获取最新版本的ffmpeg
+使用下面的命令进行配置，生成Makefile文件，然后make吧。
+
+
+configure --enable-gpl --enable-nonfree --enable-pthreads --enable-libfaac --enable-libfaad --enable-libmp3lame --enable-libx264
+
+其中最重要的事情是注意 --enable-libx264  这个编译选项。
+Step 2: 转码视频格式，让 iPhone 可以使用
+我们必须让ffmpeg创建 X264编码格式的视频流， iPhone才能播放，有几个步骤需要注意：
+
+视频文件的码率必须在: 100 Kbps to 1.6 Mbps    这个范围
+苹果公司建议的视频流为:
+Low – 96 Kbps video, 64 Kbps audio
+Medium – 256 Kbps video, 64 Kbps audio
+High – 800 Kbps video, 64 Kbps audio
+iPhone 的屏幕视频播放尺寸设置为: 480×320
+建议使用下面的参数进行视频转码：
+
+ffmpeg -i <in file> -f mpegts -acodec libmp3lame -ar 48000 -ab 64k -s 320×240 -vcodec libx264 -b 96k -flags +loop -cmp +chroma -partitions +parti4x4+partp8x8+partb8x8 -subq 5 -trellis 1 -refs 1 -coder 0 -me_range 16 -keyint_min 25 -sc_threshold 40 -i_qfactor 0.71 -bt 200k -maxrate 96k -bufsize 96k -rc_eq 'blurCplx^(1-qComp)' -qcomp 0.6 -qmin 10 -qmax 51 -qdiff 4 -level 30 -aspect 320:240 -g 30 -async 2 <output file>
+假如你想知道这些命令参数的更详细的信息，请参考 X264 encoding guide  和 FFMpeg documentation ， 上面例子设置的码率为98k， 你可以修改为你想设置的码率。
+
+要更改的参数为   “   -b, -maxrate,  -bufsize values   ”
+
+Step 3: 下载并编译 segmenter 
+现在，你已经完成了视频采集的工作，但是还没有完成整个构建HTTP  Streaming 的过程。 你需要一种方法来把视频文件切成小块，你可以下载苹果的 segmenter 。
+
+下载切片源码的SVN地址为 ：  segmenter source.  
+下载下来后用下面的命令即可编译 ：
+all:
+        gcc -Wall -g segmenter.c -o segmenter -lavformat -lavcodec -lavutil -lbz2 -lm -lz -lfaac -lmp3lame -lx264 -lfaad
+clean:
+        rm segmenter
+
+在编译完成了 segmenter 工具之后， 你就可以创建你的 HTTP  Streaming 内容了。
+
+命令格式为:
+
+segmenter <input MPEG-TS file> <segment duration in seconds> <output MPEG-TS file prefix> <output m3u8 index file> <http prefix>
+下面是一个使用的例子，从视频文件创建一个流， 每个切片文件10秒：
+
+segmenter sample_low.ts 10 sample_low stream_low.m3u8 http://www.ioncannon.net/
+Step 4: 准备 HTTP server 服务器
+进行到这一步的时候， 你应该已经有好多视频流的切片文件了，这些文件可以上传到web服务器， 但是这里有一个比较重要的事情需要注意，那就是mime types的设置。
+.m3u8    application/x-mpegURL
+.ts      video/MP2T
+假如你使用的是Apache服务器的话，你需要添加如下的代码到 httpd.conf 配置文件里:
+
+AddType application/x-mpegURL .m3u8
+AddType video/MP2T .ts
+假如你使用的是 lighttpd  服务器的话，你需要添加下面的代码到你的配置文件中：
+
+mimetype.assign = ( ".m3u8" => "application/x-mpegURL", ".ts" => "video/MP2T" )
+Step 5: 测试 stream
+万事俱备只欠东风了，下来需要使用 HTML5 的 video 标签，例子如下：
+
+<html>
+  <head>
+    <title>Video Test</title>
+    <metaname="viewport"content="width=320; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;"/>
+  </head>
+  <bodystyle="background-color:#FFFFFF; ">
+    <center>
+      <video width='150'height='150'src="stream-128k.m3u8"/>
+    </center>
+  </body>
+</html>
+上面所有的步骤都正确的话，你现在应该已经看到视频了。
+
+假如你想在应用程序里面测试上面的视频流的话，你需要下载苹果公司的视频播放器，下载地址为： download the MoviePlayer iPhone demo application 。 
+
+Step 6: 自动化的 stream 编码和切片 segmentation
+这是一个小脚本，可以把输入文件编码转换后再切片为10秒一个的文件小块。
+
+
+#!/bin/sh
+BR=800k
+
+ffmpeg -i $1 -f mpegts -acodec libmp3lame -ar 48000-ab 64k-s 320×240-vcodec libx264-b$BR-flags+loop-cmp +chroma-partitions +parti4x4+partp8x8+partb8x8-subq 5-trellis 1-refs 1-coder 0 -me_range 16 -keyint_min 25 -sc_threshold 40 -i_qfactor 0.71-bt 200k-maxrate$BR-bufsize$BR -rc_eq'blurCplx^(1-qComp)'-qcomp 0.6-qmin 10-qmax 51-qdiff 4-level 30-aspect 320:240-g 30-async 2 sample_$BR_pre.ts
+
+segmenter sample_$BR_pre.ts 10 sample_$BR stream-$BR.m3u8 http://www.ioncannon.net/
+
+rm -f sample_$BR_pre.ts
+
+
+Step 7: 创建不同码率 rate 的 HTTP stream
+之前将的例子都是创建单一码率的HTTP Stream， 我们需要创建不同码率的视频流， 下面是一个简单的小例子。
+
+[plain] view plaincopy 
+#EXTM3U  
+#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=96000  
+http://192.168.132.15/ipv/stream-96k.m3u8  
+#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=256000  
+http://192.168.132.15/ipv/stream-256k.m3u8  
+#EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=800000  
+http://192.168.132.15/ipv/stream-800k.m3u8  
+
+六、让nginx支持MP4文件的直接播放
+
+这是nginx的第三方模块的网址 ： http://wiki.nginx.org/3rdPartyModules
+在上面可以找到支持MP4的模块，我们也可以直接从下面的网址下载 ：
+http://h264.code-shop.com/download/nginx_mod_h264_streaming-2.2.7.tar.gz
+编译的时候可能会有点小错误：
+
+解决错误：
+
+因为在新版本的nginx中废弃了  zero_in_uri  这个flag，稍微修改一下 nginx_mod_h264_streaming 的源代码
+vim /usr/local/src/nginx_mod_h264_streaming-2.2.7/src/ngx_http_streaming_module.c
+
+把158到161行注释掉
+
+157   /* TODO: Win32 */
+158   //if (r->zero_in_uri)
+159   //{
+160   //  return NGX_DECLINED;
+161   //}
+然后再make就正常了，make install 完成安装
+
+在nginx配置文件中加入
+
+location ~ .mp4$ {
+                mp4;
+        }
+
+
+
+下面的命令从摄像头采集数据后发送到服务器进行切片
+[plain] view plaincopy 
+C:\ffmpeg-win64-static\bin>ffmpeg.exe  -f  dshow  -i  video="Integrated Camera"  -vcodec  libx264  -pix_fmt  yuv420p  -f  flv  rtmp://192.168.59.129/hls/mystream  
+
+
+下面的命令时以文件gd.flv为输入数据流， 转码后发送到服务器进行切片
+[plain] view plaincopy 
+C:\ffmpeg-win64-static\bin>ffmpeg.exe -re  -i  "E:\Movie\gd.flv"  -vcodec   copy  -acodec   copy   -f   flv   rtmp://192.168.59.129/hls/mystream  
+
+[plain] view plaincopy 
+ffmpeg.exe -f dshow -i video="Integrated Camera":audio="麦克风 (Realtek High Definition Au" -q 4 -s 640*480 -aspect 4:3 -r 10 -vcodec flv  -ar 22050 -ab 64k -ac 1 -acodec libmp3lame -threads 4 -f flv rtmp://192.168.59.129/hls/mystream  
+ffmpeg.exe -f dshow -i video="Integrated Camera":audio="麦克风 (Realtek High Definition Au" -s 640*480 -vcodec  libx264 -acodec libmp3lame -pix_fmt  yuv420p -threads 4 -f  flv  rtmp://192.168.59.129/hls/mystream  
+
+虚拟切片：
+
+https://github.com/AndyA/ts-split
+
+
+摄像头采集后的数据直接切片 ：
+
+ffmpeg.exe -f dshow -i video="Integrated Camera":audio="麦克风 (Realtek High Definition Au" -s 640*480 -vcodec  libx264 -acodec libmp3lame -flags -global_header -map 0 -f segment -segment_time 10 -segment_list live.m3u8 -segment_format mpegts live%05d.ts
+
+
+FMPEG 把文件传送到rtmp的速度不正常的问题：
+
+ffmpeg -re -i "输入文件"-qscale 3 -s 720*360 -aspect 16:9 -r 25 -threads 4 -vcodec flv-acodec libmp3lame -ar 44100 -ab 128k -ac 2 -f flvrtmp://127.0.0.1/rtmpsvr/RtmpVideo
+
+关键是 -re解决同步压缩和办法的速度同步问题，而且要放在前面，不然不一定起作用！
+
+
+
+
+
+
+
+
+
+
+
+
+ffmpeg处理rtmp直播流（截图、收录）
+首先应该感谢http://hi.baidu.com/newdreamllc/item/ee6beb0e2bbbcc8f02ce1ba6（天下文章一大抄），也不知道他是抄过来的还是自己写的，他给了我启发，当然不是抄的启发，而是里面内容确实让我完成了ffmpeg对rtmp直播流截图的处理，之前都有试过用opencv写个程序截图，但是写完发现，在使用载入视频流函数的时间比较长，这个也就容忍了，竟然在输入错误的流地址的时候，程序竟然死了，对，就是死掉了！！！我这样对程序严谨的人，怎么能允许这个错误呢，果断抛弃。废话不多说，先看我的一系列参数：
+
+ 
+
+[plain] view plaincopy在CODE上查看代码片派生到我的代码片 
+ffmpeg.exe -probesize 32768 -i "rtmp://｛ip｝/live/1 live=1" -y -t 0.001 -ss 1 -f image2 -r 1 c:/rtm.jpeg  
+
+可能，也许，差不多后面的参数少的话就出现什么流找不到啊，什么的，下面来分析一下参数
+
+-probesize 32768 ：没有查到这个参数什么意思，不过字面意思是探针的大小，可能是内存申请32768大小的内存把
+
+-i “rtmp。。。”    ：后接地址
+
+-y                              ：覆盖输出文件，即如果1.***文件已经存在的话，不经提示就覆盖掉了
+
+-t 0.001                   ：设置纪录时间 hh:mm:ss[.xxx]格式的记录时间也支持
+
+-ss 1                       ：延迟1秒后开始
+
+-f image2               ：以图片格式保存
+
+-r 1                          ：帧数，此处为截取一帧
+
+最重要的要说一下： 在-i 后的地址，要用双引号括起来，如果是rtmp直播流，双引号里面要加上live=1
+
+如果还不行的话，估计就是ffmpeg这个sdk有问题了，可能是里面没有兼容rtmp的东西，看看第一行链接里面的东西把，希望对你们有帮助。
+
+
+
+重要：
+
+当上述命令可以执行以后，会发现，录制的视频或者直播的视频图像质量非常不好，这是因为没有设置视频码率；
+
+设置视频码率命令为： -s 640x360 -b:v 580k ；
+
+可以根据具体的分辨率设置具体的码率；
+
+
+也可以通过 -qscale，设置图像质量；
+
+https://blog.csdn.net/jinghao666666/article/details/50731074
+======================================================================================================
+ffmpeg使用小结
+2015年10月21日 19:49:51 阅读数：1347 标签： ffmpeg  更多
+个人分类： ffmpeg
+一、 FFmpeg是什么？
+简单说，FFmpeg就是一个很好的，免费的，开源的视频转换工具。详细说，FFmpeg是一个开源免费跨平台的视频和音频流方案，属于自由软件，采用LGPL或GPL许可证（依据你选择的组件）。它提供了录制、转换以及流化音视频的完整解决方案。它包含了非常先进的音频/视频编解码库libavcodec，为了保证高可移植性和编解码质量，libavcodec里很多codec都是从头开发的。
+
+   FFmpeg的官网是：http://ffmpeg.org/，下载地址：http://ffmpeg.org/download.html。需要的同学可以从官网自行下载。
+
+官网的解释是：ffmpeg is a command line tool to convert multimedia files between formats.即：ffmpeg是用来转换不同格式的多媒体文件的一个命令行工具。
+
+ 
+
+二、 FFmpeg功能是什么？
+FFmpeg有非常强大的功能 ,包括视频采集功能、视频格式转换、视频抓图、给视频加水印等。ffmpeg是用来转换不同格式的多媒体文件的一个命令行工具。
+
+这里重点讲讲视频格式转换功能，ffmpeg视频转换功能。视频格式转换，比如可以将多种视频格式转换为flv格式，可不是视频信号转换 。
+
+ffmpeg可以轻易地实现多种视频格式之间的相互转换(wma,rm,MP4,mod等)，例如可以将摄录下的视频MP4等转成现在视频网站所采用的flv格式。
+
+三、 FFmpeg究竟怎么用？
+第一，下载FFmpeg。
+
+先根据自己的系统到官网是：http://ffmpeg.org/下载好对应版本的FFmpeg，下载地址：http://ffmpeg.org/download.html。一般工具名称为：ffmpeg-20140123-git-e6d1c66-win64-static.7z，解压后可以直接使用该工具了，直接到D:\路径\ffmpeg-20140123-git-e6d1c66-win64-static\bin\ ffmpeg.exe下，准备好命令行和批处理文件就可以直接转换了。
+
+第二，命令集的简单实用方法
+
+1.获取视频的信息
+
+ffmpeg -i video.MP4
+
+2.将图片序列合成视频
+
+ffmpeg -f image2 -i image%d.jpg video.mpg
+
+上面的命令会把当前目录下的图片（名字如：image1.jpg. image2.jpg. 等...）合并成video.mpg
+
+3.将视频分解成图片序列
+
+ffmpeg -i video.mpg image%d.jpg
+
+上面的命令会生成image1.jpg. image2.jpg. ...
+
+支持的图片格式有：PGM. PPM. PAM. PGMYUV. JPEG. GIF. PNG. TIFF. SGI
+
+4.为视频重新编码以适合在iPod/iPhone上播放
+
+ffmpeg -i source_video.MP4 input -acodec aac -ab 128kb -vcodec mpeg4 -b 1200kb -mbd 2 -flags +4mv+trell -aic 2 -cmp 2 -subcmp 2 -s 320x180 -title X final_video.mp4
+
+说明：
+
+* 源视频：source_video.MP4
+
+* 音频编码：aac
+
+* 音频位率：128kb/s
+
+* 视频编码：mpeg4
+
+* 视频位率：1200kb/s
+
+* 视频尺寸：320 X 180
+
+* 生成的视频：final_video.mp4
+
+5.为视频重新编码以适合在PSP上播放
+
+ffmpeg -i source_video.MP4 -b 300 -s 320x240 -vcodec xvid -ab 32 -ar 24000 -acodec aac final_video.mp4
+
+说明：
+
+* 源视频：source_video.MP4
+
+* 音频编码：aac
+
+* 音频位率：32kb/s
+
+* 视频编码：xvid
+
+* 视频位率：1200kb/s
+
+* 视频尺寸：320 X 180
+
+* 生成的视频：final_video.mp4
+
+6.从视频抽出声音.并存为Mp3
+
+ffmpeg -i source_video.MP4 -vn -ar 44100 -ac 2 -ab 192 -f mp3 sound.mp3
+
+说明：
+
+* 源视频：source_video.MP4
+
+* 音频位率：192kb/s
+
+* 输出格式：mp3
+
+* 生成的声音：sound.mp3
+
+7.将wav文件转成Mp3
+
+ffmpeg -i son_origine.MP4 -vn -ar 44100 -ac 2 -ab 192 -f mp3 son_final.mp3
+
+8.将.MP4视频转成.mpg
+
+ffmpeg -i video_origine.MP4 video_finale.mpg
+
+9.将.mpg转成.MP4
+
+ffmpeg -i video_origine.mpg video_finale.MP4
+
+10.将.MP4转成gif动画（未压缩）
+
+ffmpeg -i video_origine.MP4 gif_anime.gif
+
+11.合成视频和音频
+
+ffmpeg -i son.wav -i video_origine.MP4 video_finale.mpg
+
+12.将.MP4转成.flv
+
+ffmpeg -i video_origine.MP4 -ab 56 -ar 44100 -b 200 -r 15 -s 320x240 -f flv video_finale.flv
+
+13.将.MP4转成dv
+
+ffmpeg -i video_origine.MP4 -s pal -r pal -aspect 4:3 -ar 48000 -ac 2 video_finale.dv
+
+或者：
+
+ffmpeg -i video_origine.MP4 -target pal-dv video_finale.dv
+
+14.将.MP4压缩成divx
+
+ffmpeg -i video_origine.MP4 -s 320x240 -vcodec msmpeg4v2 video_finale.MP4
+
+15.将Ogg Theora压缩成Mpeg dvd
+
+ffmpeg -i film_sortie_cinelerra.ogm -s 720x576 -vcodec mpeg2video -acodec mp3 film_terminate.mpg
+
+16.将.MP4压缩成SVCD mpeg2
+
+NTSC格式：
+
+ffmpeg -i video_origine.MP4 -target ntsc-svcd video_finale.mpg
+
+PAL格式：
+
+ffmpeg -i video_origine.MP4 -target pal-svcd video_finale.mpg
+
+17.将.MP4压缩成VCD mpeg2
+
+NTSC格式：
+
+ffmpeg -i video_origine.MP4 -target ntsc-vcd video_finale.mpg
+
+PAL格式：
+
+ffmpeg -i video_origine.MP4 -target pal-vcd video_finale.mpg
+
+18.多通道编码
+
+ffmpeg -i fichierentree -pass 2 -passlogfile ffmpeg2pass fichiersortie-2
+
+19.从flv提取mp3
+
+ffmpeg -i source.flv -ab 128k dest.mp3
+
+第三，认识ffmpeg的不同编码器
+
+ffmpeg version N-60106-ge6d1c66 Copyright (c) 2000-2014 the FFmpeg developers
+
+  built on Jan 22 2014 22:06:20 with gcc 4.8.2 (GCC)
+
+  configuration: --enable-gpl --enable-version3 --disable-w32threads --enable-av
+
+isynth --enable-bzlib --enable-fontconfig --enable-frei0r --enable-gnutls --enab
+
+le-iconv --enable-libass --enable-libbluray --enable-libcaca --enable-libfreetyp
+
+e --enable-libgsm --enable-libilbc --enable-libmodplug --enable-libmp3lame --ena
+
+ble-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenjpeg --enable-l
+
+ibopus --enable-librtmp --enable-libschroedinger --enable-libsoxr --enable-libsp
+
+eex --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvo-aa
+
+cenc --enable-libvo-amrwbenc --enable-libvorbis --enable-libvpx --enable-libwavp
+
+ack --enable-libx264 --enable-libxavs --enable-libxvid --enable-zlib
+
+  libavutil      52. 63.100 / 52. 63.100
+
+  libavcodec     55. 49.100 / 55. 49.100
+
+  libavformat    55. 25.101 / 55. 25.101
+
+  libavdevice    55.  5.102 / 55.  5.102
+
+  libavfilter     4.  1.100 /  4.  1.100
+
+  libswscale      2.  5.101 /  2.  5.101
+
+  libswresample   0. 17.104 /  0. 17.104
+
+  libpostproc    52.  3.100 / 52.  3.100
+
+Input #0, MP4, from 'E:\FormatTransfer_Tools\ffmpeg\bin\test.MP4':
+
+  Metadata:
+
+    encoder         : Lavf55.25.101
+
+  Duration: 00:01:32.04, start: 0.000000, bitrate: 5774 kb/s
+
+    Stream #0:0: Video: mpeg4 (Simple Profile) (FMP4 / 0x34504D46), yuv420p, 192
+
+0x1080 [SAR 1:1 DAR 16:9], 60 tbr, 60 tbn, 60 tbc
+
+    Stream #0:1: Audio: mp3 (U[0][0][0] / 0x0055), 48000 Hz, stereo, s16p, 128 k
+
+b/s
+
+Invalid encoder type 'xsub'
+
+Encoders:
+
+ V..... = Video
+
+ A..... = Audio
+
+ S..... = Subtitle
+
+ .F.... = Frame-level multithreading
+
+ ..S... = Slice-level multithreading
+
+ ...X.. = Codec is experimental
+
+ ....B. = Supports draw_horiz_band
+
+ .....D = Supports direct rendering method 1
+
+ ------
+
+ V..... a64multi             Multicolor charset for Commodore 64 (codec a64_multi)
+
+ V..... a64multi5            Multicolor charset for Commodore 64, extended with 5th color (colram) (codec a64_multi5)
+
+ V..... amv                  AMV Video
+
+ V..... asv1                 ASUS V1
+
+ V..... asv2                 ASUS V2
+
+ V..... avrp                 MP4d 1:1 10-bit RGB Packer
+
+ V..X.. avui                 MP4d Meridien Uncompressed
+
+ V..... ayuv                 Uncompressed packed MS 4:4:4:4
+
+ V..... bmp                  BMP (Windows and OS/2 bitmap)
+
+ V..... libxavs              libxavs Chinese AVS (Audio Video Standard) (codec cavs)
+
+ V..... cinepak              Cinepak / CVID
+
+ V..... cljr                 Cirrus Logic AccuPak
+
+ V..... libschroedinger      libschroedinger Dirac 2.2 (codec dirac)
+
+ V.S... dnxhd                VC3/DNxHD
+
+ V..... dpx                  DPX (Digital Picture Exchange) image
+
+ V.S... dvvideo              DV (Digital Video)
+
+ V.S... ffv1                 FFmpeg video codec #1
+
+ V..... ffvhuff              Huffyuv FFmpeg variant
+
+ V..... flashsv              Flash Screen Video
+
+ V..... flashsv2             Flash Screen Video Version 2
+
+ V..... flv                  FLV / Sorenson Spark / Sorenson H.263 (Flash Video) (codec flv1)
+
+ V..... gif                  GIF (Graphics Interchange Format)
+
+ V..... h261                 H.261
+
+ V..... h263                 H.263 / H.263-1996
+
+ V.S... h263p                H.263+ / H.263-1998 / H.263 version 2
+
+ V..... libx264              libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (codec h264)
+
+ V..... libx264rgb           libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 RGB (codec h264)
+
+ V..... huffyuv              Huffyuv / HuffYUV
+
+ V..X.. jpeg2000             JPEG 2000
+
+ V..... libopenjpeg          OpenJPEG JPEG 2000 (codec jpeg2000)
+
+ V..... jpegls               JPEG-LS
+
+ V..... ljpeg                Lossless JPEG
+
+ VFS... mjpeg                MJPEG (Motion JPEG)
+
+ V.S... mpeg1video           MPEG-1 video
+
+ V.S... mpeg2video           MPEG-2 video
+
+ V.S... mpeg4                MPEG-4 part 2
+
+ V..... libxvid              libxvidcore MPEG-4 part 2 (codec mpeg4)
+
+ V..... msmpeg4v2            MPEG-4 part 2 Microsoft variant version 2
+
+ V..... msmpeg4              MPEG-4 part 2 Microsoft variant version 3 (codec msmpeg4v3)
+
+ V..... msvideo1             Microsoft Video-1
+
+ V..... pam                  PAM (Portable AnyMap) image
+
+ V..... pbm                  PBM (Portable BitMap) image
+
+ V..... pcx                  PC Paintbrush PCX image
+
+ V..... pgm                  PGM (Portable GrayMap) image
+
+ V..... pgmyuv               PGMYUV (Portable GrayMap YUV) image
+
+ VF.... png                  PNG (Portable Network Graphics) image
+
+ V..... ppm                  PPM (Portable PixelMap) image
+
+ VF.... prores               Apple ProRes
+
+ VF.... prores_aw            Apple ProRes (codec prores)
+
+ V.S... prores_ks            Apple ProRes (iCodec Pro) (codec prores)
+
+ V..... qtrle                QuickTime Animation (RLE) video
+
+ V..... r10k                 AJA Kona 10-bit RGB Codec
+
+ V..... r210                 Uncompressed RGB 10-bit
+
+ V..... rawvideo             raw video
+
+ V..... roqvideo             id RoQ video (codec roq)
+
+ V..... rv10                 RealVideo 1.0
+
+ V..... rv20                 RealVideo 2.0
+
+ V..... sgi                  SGI image
+
+ V..... snow                 Snow
+
+ V..... sunrast              Sun Rasterfile image
+
+ V..... svq1                 Sorenson Vector Quantizer 1 / Sorenson Video 1 / SVQ1
+
+ V..... targa                Truevision Targa image
+
+ V..... libtheora            libtheora Theora (codec theora)
+
+ V..... tiff                 TIFF image
+
+ V..... utvideo              Ut Video
+
+ V..... v210                 Uncompressed 4:2:2 10-bit
+
+ V..... v308                 Uncompressed packed 4:4:4
+
+ V..... v408                 Uncompressed packed QT 4:4:4:4
+
+ V..... v410                 Uncompressed 4:4:4 10-bit
+
+ V..... libvpx               libvpx VP8 (codec vp8)
+
+ V..... libvpx-vp9           libvpx VP9 (codec vp9)
+
+ V..... wmv1                 Windows Media Video 7
+
+ V..... wmv2                 Windows Media Video 8
+
+ V..... xbm                  XBM (X BitMap) image
+
+ V..... xface                X-face image
+
+ V..... xwd                  XWD (X Window Dump) image
+
+ V..... y41p                 Uncompressed YUV 4:1:1 12-bit
+
+ V..... yuv4                 Uncompressed packed 4:2:0
+
+ V..... zlib                 LCL (LossLess Codec Library) ZLIB
+
+ V..... zmbv                 Zip Motion Blocks Video
+
+ A..X.. aac                  AAC (Advanced Audio Coding)
+
+ A..... libvo_aacenc         Android VisualOn AAC (Advanced Audio Coding) (codec aac)
+
+ A..... ac3                  ATSC A/52A (AC-3)
+
+ A..... ac3_fixed            ATSC A/52A (AC-3) (codec ac3)
+
+ A..... adpcm_adx            SEGA CRI ADX ADPCM
+
+ A..... g722                 G.722 ADPCM (codec adpcm_g722)
+
+ A..... g726                 G.726 ADPCM (codec adpcm_g726)
+
+ A..... adpcm_ima_qt         ADPCM IMA QuickTime
+
+ A..... adpcm_ima_wav        ADPCM IMA WAV
+
+ A..... adpcm_ms             ADPCM Microsoft
+
+ A..... adpcm_swf            ADPCM Shockwave Flash
+
+ A..... adpcm_yamaha         ADPCM Yamaha
+
+ A..... alac                 ALAC (Apple Lossless Audio Codec)
+
+ A..... libopencore_amrnb    OpenCORE AMR-NB (Adaptive Multi-Rate Narrow-Band) (codec amr_nb)
+
+ A..... libvo_amrwbenc       Android VisualOn AMR-WB (Adaptive Multi-Rate Wide-Band) (codec amr_wb)
+
+ A..... comfortnoise         RFC 3389 comfort noise generator
+
+ A..X.. dca                  DCA (DTS Coherent Acoustics) (codec dts)
+
+ A..... eac3                 ATSC A/52 E-AC-3
+
+ A..... flac                 FLAC (Free Lossless Audio Codec)
+
+ A..... g723_1               G.723.1
+
+ A..... libgsm               libgsm GSM (codec gsm)
+
+ A..... libgsm_ms            libgsm GSM Microsoft variant (codec gsm_ms)
+
+ A..... libilbc              iLBC (Internet Low Bitrate Codec) (codec ilbc)
+
+ A..... mp2                  MP2 (MPEG audio layer 2)
+
+ A..... mp2fixed             MP2 fixed point (MPEG audio layer 2) (codec mp2)
+
+ A..... libtwolame           libtwolame MP2 (MPEG audio layer 2) (codec mp2)
+
+ A..... libmp3lame           libmp3lame MP3 (MPEG audio layer 3) (codec mp3)
+
+ A..... nellymoser           Nellymoser Asao
+
+ A..... libopus              libopus Opus (codec opus)
+
+ A..... pcm_alaw             PCM A-law / G.711 A-law
+
+ A..... pcm_f32be            PCM 32-bit floating point big-endian
+
+ A..... pcm_f32le            PCM 32-bit floating point little-endian
+
+ A..... pcm_f64be            PCM 64-bit floating point big-endian
+
+ A..... pcm_f64le            PCM 64-bit floating point little-endian
+
+ A..... pcm_mulaw            PCM mu-law / G.711 mu-law
+
+ A..... pcm_s16be            PCM signed 16-bit big-endian
+
+ A..... pcm_s16be_planar     PCM signed 16-bit big-endian planar
+
+ A..... pcm_s16le            PCM signed 16-bit little-endian
+
+ A..... pcm_s16le_planar     PCM signed 16-bit little-endian planar
+
+ A..... pcm_s24be            PCM signed 24-bit big-endian
+
+ A..... pcm_s24daud          PCM D-Cinema audio signed 24-bit
+
+ A..... pcm_s24le            PCM signed 24-bit little-endian
+
+ A..... pcm_s24le_planar     PCM signed 24-bit little-endian planar
+
+ A..... pcm_s32be            PCM signed 32-bit big-endian
+
+ A..... pcm_s32le            PCM signed 32-bit little-endian
+
+ A..... pcm_s32le_planar     PCM signed 32-bit little-endian planar
+
+ A..... pcm_s8               PCM signed 8-bit
+
+ A..... pcm_s8_planar        PCM signed 8-bit planar
+
+ A..... pcm_u16be            PCM unsigned 16-bit big-endian
+
+ A..... pcm_u16le            PCM unsigned 16-bit little-endian
+
+ A..... pcm_u24be            PCM unsigned 24-bit big-endian
+
+ A..... pcm_u24le            PCM unsigned 24-bit little-endian
+
+ A..... pcm_u32be            PCM unsigned 32-bit big-endian
+
+ A..... pcm_u32le            PCM unsigned 32-bit little-endian
+
+ A..... pcm_u8               PCM unsigned 8-bit
+
+ A..... real_144             RealAudio 1.0 (14.4K) (codec ra_144)
+
+ A..... roq_dpcm             id RoQ DPCM
+
+ A..X.. s302m                SMPTE 302M
+
+ A..X.. sonic                Sonic
+
+ A..X.. sonicls              Sonic lossless
+
+ A..... libspeex             libspeex Speex (codec speex)
+
+ A..... tta                  TTA (True Audio)
+
+ A..X.. vorbis               Vorbis
+
+ A..... libvorbis            libvorbis (codec vorbis)
+
+ A..... wavpack              WavPack
+
+ A..... libwavpack            (codec wavpack)
+
+ A..... wmav1                Windows Media Audio 1
+
+ A..... wmav2                Windows Media Audio 2
+
+ S..... ass                  ASS (Advanced SubStation Alpha) subtitle
+
+ S..... dvbsub               DVB subtitles (codec dvb_subtitle)
+
+ S..... dvdsub               DVD subtitles (codec dvd_subtitle)
+
+ S..... mov_text             3GPP Timed Text subtitle
+
+ S..... srt                  SubRip subtitle with embedded timing
+
+ S..... ssa                  SSA (SubStation Alpha) subtitle
+
+ S..... subrip               SubRip subtitle
+
+ S..... xsub                 DivX subtitles (XSUB)
+
+第四，实例详解FFmpeg视频转换的参数设置方法
+
+例如：ffmpeg -y -i "test.MP4" -title "Test" -vcodec xvid -s 1920*1080 -r 30 - b 1500 -acodec aac -ac 2 -ar 24000 -ab 128 -vol 200 -f psp -muxvb 768 "test.***"
+
+ 
+
+    # 参数解释：
+
+    -y（覆盖输出文件，即如果1.***文件已经存在的话，不经提示就覆盖掉了）
+
+    -i "1.MP4"（输入文件是和ffmpeg在同一目录下的1.MP4文件，可以自己加路径，改名字）
+
+    -title "Test"（在PSP中显示的影片的标题）
+
+    -vcodec xvid（使用XVID编码压缩视频，不能改的）
+
+    -s 1920*1080（输出的分辨率为1920*1080，注意片源一定要是16:9的不然会变形）
+
+    -r 30（帧数，一般就用这个吧）
+
+    -b 1500（视频数据流量，用-b xxxx的指令则使用固定码率，数字随便改，1500以上没效果；还可以用动态码率如：-qscale 4和-qscale 6，4的质量比6高）
+
+    -acodec aac（音频编码用AAC）
+
+    -ac 2（声道数1或2）
+
+    -ar 24000（声音的采样频率，好像PSP只能支持24000Hz）
+
+    -ab 128（音频数据流量，一般选择32、64、96、128）
+
+    -vol 200（200%的音量，自己改）
+
+    -f psp（输出psp专用格式）
+
+    -muxvb 768（好像是给PSP机器识别的码率，一般选择384、512和768，我改成1500，PSP就说文件损坏了）
+
+"test.***"（输出文件名，也可以加路径改文件名）
+
+第五，不同格式之间的相互转换
+
+◆将任意视频格式（如MP4）转换成视频格式（如MPEG1）+音频格式（AC3）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.MP4 -vcodec mpeg1video –s 1920*1080 –r 60 -acodec ac3 E:\FormatTransfer_Tools\ffmpeg\bin\Video[1920x1080][60fps][MPEG1]_Audio[ac3].mpeg
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如MPEG2）+音频格式（DTS）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.MP4 -vcodec mpeg2video –s 1920*1080 –r 60 -acodec dca -strict -2 E:\FormatTransfer_Tools\ffmpeg\bin\Video[1920x1080][60fps][MPEG2]_Audio[DTS].mpeg
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如MPEG2）+音频格式（PCM）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.MP4 -vcodec mpeg2video –s 1920*1080 –r 60 -acodec pcm_alaw E:\FormatTransfer_Tools\ffmpeg\bin\Video[1920x1080][60fps][MPEG2]_Audio[PCM].mpeg
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如MPEG4）+音频格式（MP3）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.MP4 -vcodec mpeg4 –s 1920*1080 –r 60 -acodec dlibmp3lame E:\FormatTransfer_Tools\ffmpeg\bin\Video[1920x1080][60fps][MPEG4]_Audio[ac3].mpeg
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如MJPEG）+音频格式（MP2）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.MP4 -vcodec mjpeg –s 1920*1080 –r 60 -acodec mp2 E:\FormatTransfer_Tools\ffmpeg\bin\Video[1920x1080][60fps][ MJPEG]_Audio[MP2].mpeg
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如DivX5）+音频格式（DTS）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\Video[1920x1080][60fps][DIVX5]_Audio[AC3].MP4   –s 1920*1080 –r 60  -acodec dca -strict -2 E:\FormatTransfer_Tools\ffmpeg\bin\Video[1920x1080][60fps][DIVX5]_Audio[dts].MP4
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如H.263）+音频格式（AC3）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.mp4 -vcodec h263p -s 720x480 -acodec ac3 E:\FormatTransfer_Tools\ffmpeg\bin\Video[720x480][60fps][h263]_Audio[ac3].MP4
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如H.264）+音频格式（AAC）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.mp4 -vcodec libx264rgb  –s 1920*1080 -r 30 -acodec libvo_aacenc E:\FormatTransfer_Tools\ffmpeg\bin\Video[1920x1080][30fps][h264]_Audio[aac].3gp
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如Sorenson_Spark）+音频格式（MP3）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.mp4 -vcodec flv  –s 1920*1080 –r 60 -acodec libmp3lame E:\FormatTransfer_Tools\ffmpeg\bin\Video[1920x1080][60fps][Sorenson_Spark]_Audio[MP3].MP4
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如WMV3）+音频格式（WMA）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.mp4 -vcodec wmv3image  –s 1920*1080 –r 60 -acodec wmav1 E:\FormatTransfer_Tools\ffmpeg\bin\Video[1920x1080][60fps][WMV3]_Audio[wma1].MP4
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如XviD）+音频格式（AC3）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.mp4 -vcodec libxvid  –s 1920*1080 –r 60 -acodec ac3 E:\FormatTransfer_Tools\ffmpeg\bin\Video[1920x1080][60fps][XviD]_Audio[AC3_fixed].MP4
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如RV）+音频格式（AAC）的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.mp4 -vcodec rv10 -s 1280x720 -acodec libvo_aacenc E:\FormatTransfer_Tools\ffmpeg\bin\Video[1280x720][60fps][RV10]_Audio[aac].MP4
+
+ 
+
+◆将任意视频格式（如MP4）转换成视频格式（如H.264）+分辨率为4k的视频：
+
+ffmpeg -y -i E:\FormatTransfer_Tools\ffmpeg\bin\test.mp4 -vcodec libx264rgb -s 4096x2304 -r 30 -acodec libmp3lame E:\FormatTransfer_Tools\ffmpeg\bin\Video[4096x2304][30fps][h264]_Audio[mp3].avi
+
+总结
+第一，FFmpeg工具是一个开源的的视频和音频的转换命令行工具。
+
+第二，FFmpeg可以轻易地实现多种视频格式之间的相互转换。几乎所有的视频格式可以相互转换，支持任意分辨率为1920*1080和4096x2304的视频，还支持视频帧率为60fps的视频，还支持多种视频编码格式（如MPEG-1，MPEG-2，MPEG-4 ASP，MJPEG，DivX 3，DivX 4，DivX 5，XviD，H.263，AVC/H.264，Sorenson Spark，VC-1，WMV3），更支持多种音频编码格式。
+
+第三，FFmpeg也有不完善的视频格式编码，如RV 8/9/10。有些格式项目组的开发人员还在调试编译中，具体需要到官网了解。
+
+原文发表于http://www.cnblogs.com/reach296/
+======================================================================================================
+最近做视频上传，去水印，打水印，切割，分发趟了不少坑这里分享一下心得，所有的都是我亲自己躺过，欢迎一起交流！
+
+我的开发环境: Mac
+
+我的线上环境：
+
+Centos7.2 
+
+ffmpeg version N-91330-ga990184 Copyright (c) 2000-2018 the FFmpeg developers
+  built with gcc 4.8.5 (GCC) 20150623 (Red Hat 4.8.5-28)
+  configuration: --prefix=/root/ffmpeg_build --pkg-config-flags=--static --extra-cflags=-I/root/ffmpeg_build/include --extra-ldflags=-L/root/ffmpeg_build/lib --extra-libs=-lpthread --extra-libs=-lm --bindir=/root/bin --enable-gpl --enable-libfdk_aac --enable-libfreetype --enable-libmp3lame --enable-libvorbis --enable-libtheora --enable-libvpx --enable-libx264 --enable-libx265 --enable-nonfree
+  libavutil      56. 18.102 / 56. 18.102
+  libavcodec     58. 20.103 / 58. 20.103
+  libavformat    58. 17.100 / 58. 17.100
+  libavdevice    58.  4.101 / 58.  4.101
+  libavfilter     7. 25.100 /  7. 25.100
+  libswscale      5.  2.100 /  5.  2.100
+  libswresample   3.  2.100 /  3.  2.100
+  libpostproc    55.  2.100 / 55.  2.100
+
+1.首先肯定需要准备工具了 ffmpeg 终极神器！
+
+再次申明不要使用yum来安装，版本太低，很多特性用不了！
+
+关于 Centos7.2 与 ffmpeg 的编译过程可以看这里官方文档 《Centos编译安装 ffmpeg》
+
+按照编译一步步来就可以了。
+
+如果中途编译出错，可以参看下面这篇文章
+
+http://tutorialspots.com/how-to-fix-error-while-compiling-libx264-avcomponentdescriptor-has-no-member-named-depth-4187.html
+
+
+
+2.安装完毕后就可以进行各种切割了
+
+当然视频是在本地，肯定会有各种奇葩的视频，比如各个位置的水印，特别高清的视频，都是要进行处理的。一般没有问题的视频我就直接上传服务器，进行自动上水印，分片m3u8，分发各个服务器。这里贴一下我使用的各种参数：
+
+去水印：
+
+ffmpeg -i input.mp4 -c:v libx264 -preset fast -crf 25 -c:a copy -vf delogo=x=574:y=360:w=122:h=26 output.mp4
+delogode的参数如下：
+
+x=515 水印的横向位置
+
+y=19 水印的纵向位置
+
+w=109 要去水印的蒙层宽度
+
+h=42 要去水印的蒙层高度
+
+
+
+其中能影响片子质量的就是 -preset fast 参数和 -crf 参数，关于这两个参数的解读有篇文章写的很详细，想了解的可以去这里看
+
+ffmpeg与x264编码指南  我在服务器上采用的是 veryslow -crf 25 基本上能压缩之前的片源，而且非常保证质量，做不到无损基
+
+本上能保证每分钟4M的大小，也就是每秒钟 70K/s 左右就可以很流畅的播放视频了。大笑 
+
+
+
+获取比特率：
+
+ffprobe input.mp4 2>&1| grep bitrate | sed 's/^.*bitrate: \(.*\) .*$/\1/g'
+注意获取出来的数字需要 x1000 也就是 后面需要加 K 
+
+
+多图图片水印：
+
+我下面的例子是打2个的，一个左上，一个右下，只打一个水印的，可以搜搜
+
+ffmpeg -y -i input.mp4  -i tl.png -i br.png -filter_complex "[1:v]scale=3/5*in_w:3/5*in_h[logo1];[2:v]scale=4/5*in_w:4/5*in_h[logo2];[0:v][logo1]overlay=x=10:y=10[bkg];[bkg][logo2]overlay=x=(main_w-overlay_w-10):y=(main_h-overlay_h-10)" -codec:a copy output.mp4
+中间的输入源 [1:v] 这种写法没有再比这个恶心的了，上面的例子 
+
+[0:v] 是第一个输入源也就是原始视频
+
+[1:v] 第二个输入源为左上水印 tl.png
+
+[2:v] 第三个输入源为右下水印 br.png
+
+ffmpeg -y -i input.mp4 -c:a copy -c:v copy -hls_time $HLS_TIME -hls_list_size 0 iav6.com.m3u8
+文字水印：
+
+ffmpeg -y -i output.mp4 -vf \"drawtext=fontfile=字体文件的绝对路径:text='iav6.com':x=10:y=10:fontsize=22:fontcolor=yellow:shadowx=1:shadowy=1,drawtext=fontfile=字体文件绝对路径:text='爱AV激情小视频':x=10:y=40:fontsize=16:fontcolor=yellow:shadowx=1:shadowy=1\" -codec:a copy -c:v libx264 -preset fast -crf 30 xxx.mp4
+命令中可以根据位置来模拟换行，字体大小，投影都是可以定制的，具体参数可以搜其他文章。不过我不建议打文字水印，因为视觉效果比图片要差很远...
+
+
+
+视频切割（ts+m3m8）：
+
+ffmpeg -y -i input.mp4 -c:a copy -c:v copy -hls_time 10 -hls_list_size 0 ouput.m3u8
+切割成m3u8+ts的 数据，直接按照源视频的音源、视频源 copy，每个 ts文件 按照 10s 切割
+
+
+
+视频旋转：
+
+一般用于直播的时候横屏录制的，需要顺时针90度旋转
+
+ffmpeg -i intput.mp4 -metadata:s:v rotate="-90" -codec copy output.mp4
+其他的数值自己可以填写
+
+
+视频剪切：
+
+一般只想选择一个场视频的片段，这个时候下面的命令就可以使用了
+
+ffmpeg -i input.mp4 -ss 00:00:30.0 -c copy -t 00:00:10.0 output.mp4
+达成相同效果，也可以用 -ss 和 -to 选项， 从第 30 秒截取到第 40 秒：
+
+ffmpeg -i input.mp4 -ss 30 -c copy -to 40 output.mp4
+
+
+视频合并：
+
+这个和视频剪切刚好相反，比如只想要视频的片段A和C，舍弃B的话，可以用下面的命令
+
+$ cat mylist.txt
+file '/path/to/file1'
+file '/path/to/file2'
+file '/path/to/file3'
+ 
+$ ffmpeg -f concat -safe 0 -i mylist.txt -c copy output.mp4
+在 i 之前增加参数 -safe 0 为了避免出现 Operation not permitted 的错误
+
+
+调整播放速度：
+
+这个我用于做视频的预览，比如一个40min的视频，我做一个10s的预览，实际上我剪切了4个5s中的片段，然后快放两倍
+
+#加速2倍
+ffmpeg -i input.mp4 -vf  "setpts=0.5*PTS" output.mp4
+ 
+#慢放就是2*PTS
+
+基本上就是这么多了，可以把打 水印 + 切片m3u8+ts 同时进行，只要拼接好参数就行!
+
+基本上就这么多，参数调试需要耐心，希望能帮助做视频直播转码的朋友少走弯路！
+
+也可以加我QQ：116680766 进行交流！
+======================================================================================================
+FFmpeg 录制桌面、麦克风、摄像头
+前言
+老师要我们试试能不能用手机拍摄视频然后发送到树莓派上。可能以后要然树莓派处理视频之类。老师描述的场景好像实时的。虽然需求不明确，我们就先试试吧。我的计划是在树莓派上搭建好流媒体服务器，然后手机拍摄视频并推送到服务器。但是找了好久也找不到靠谱的可以实时拍摄视频并推送到服务器的 Android 应用。我们也不会 Android 开发。好不容器把树莓派上的 rtmp 服务搭建好，不想在 Android 开发浪费时间了。直接在笔记本用 FFmpeg 推流吧，只要能证明树莓派可以接收视频就可以了。
+
+虽然之前用过 FFmppeg 的转码服务，但是采集视频和录音还真没干过。折腾了一天，终于知道了一些套路。先记录下来。下一步试试实时推送到树莓派上的 rtmp 服务上。
+
+我的系统为Ubuntu 16.04 Desktop x64
+
+录制麦克风
+双声道，MP3 编码，MP3 文件格式
+$ ffmpeg -f alsa -ac 2 -i hw:0,0 -acodec libmp3lame -f mp3 test1.mp3
+1
+AC3 编码，ACC 文件格式
+$ ffmpeg -f alsa -ac 2 -i hw:0,0 -acodec ac3 -f ac3 test1.aac
+1
+选择音频采集设备时可以用 -i hw:0,0 也可以用 -i plus 。官网给出的示例用的是 -i /dev/dsp 但在我的系统上提示没有这个文件或目录。
+
+录制桌面
+$ ffmpeg -f x11grab -s 1920x1080 -i :0.0 -vcodec libx264 -f mp4 test1.mp4
+1
+分辨率设为 1080P，并采用 H.264 编码，最后保存为 MP4 格式。
+
+录制摄像头
+$ ffmpeg -f video4linux2 -s 1920x1080 -t 30 -i /dev/video0 -vcodec libx264 -f mp4 test2.mp4
+1
+-t 30 表示录制 30 秒视频。
+
+录制桌面+麦克风
+$ ffmpeg -f alsa -ac 2 -i pulse -f x11grab -video_size 1920x1080 -i :0.0 -vcodec libx264 -acodec ac3 test3.mp4
+1
+录制摄像头+麦克风
+$ ffmpeg -f alsa -ac 2 -ar 44100 -i pulse  -f video4linux2 -framerate 30 -i /dev/video0 -framerate 30 -vcodec libx264 -acodec ac3 test4.mp4
+1
+女主播就是这么干的。
+
+录制桌面+摄像头
+将摄像头拍摄到的画面叠加在录制到的桌面画面的右下角
+
+$ ffmpeg -thread_queue_size 96 -f x11grab -video_size 1920x1080 -i :0.0 -f video4linux2 -video_size 400x300  -i /dev/video0  -filter_complex '[0:v][1:v]overlay=x=main_w-overlay_w-10:y=main_h-overlay_h-10[out]' -map '[out]'  test5.mp4
+1
+这个任务消耗有点大，-thread_queue_size 必须设置一个比较大的值，要不然会看到 FFmpeg输出的日志信息中不停的提醒：[video4linux2,v4l2 @ 0x25fbc40] Thread message queue blocking; consider raising the thread_queue_size option (current value: 8)，拍摄到的视频也会出现莫名其妙的错误，比如帧率很高，无法正常播放，视频不流畅等等。把 -thread_queue_size 设置为一个比较大的值，直到看不到该提示即可。
+
+录制桌面+摄像头+麦克风
+$ ffmpeg -thread_queue_size 128 -f x11grab -video_size 1920x1080 -framerate 30 -i :0.0 -f video4linux2 -video_size 400x300 -framerate 30 -i /dev/video0 -f alsa -ac 2  -i pulse -filter_complex '[0:v][1:v]overlay=x=main_w-overlay_w-10:y=main_h-overlay_h-10[out]' -map '[out]' -map 2:a  -vcodec libx264 -acodec ac3 test6.mp4
+1
+和上面一样，注意给 -thread_queue_size 设置一个足够大的值。
+
+补一个录制到的视频截图： 
+录制到的视频截图
+
+估计很多教程视频都是这么录制的。把录制的视频推一下流，就能直播写代码，直播玩游戏了。
+
+再补一个成功推流后在手机上观看的截图： 
+推流后再手机上的观看效果
+
+不够有4秒的延时。在局域网内都有4秒延时，太坑了。可能是树莓派的配置问题。
+
+推流命令：
+
+$ ffmpeg -thread_queue_size 128 -f x11grab -video_size 1920x1080 -framerate 30 -i :0.0 -f video4linux2 -video_size 400x300 -framerate 30 -i /dev/video0 -f alsa -ac 2  -i pulse -filter_complex '[0:v][1:v]overlay=x=main_w-overlay_w-10:y=main_h-overlay_h-10[out]' -map '[out]' -map 2:a  -vcodec libx264 -vprofile baseline -acodec aac -strict -2 -maxrate 3000k -b:a 128k -f flv rtmp://192.168.1.12:1935/myapp/stream2
+
+https://blog.csdn.net/candcplusplus/article/details/53955012
+======================================================================================================
+输入设备 dshow 的使用——视音频录制
+打印 DirectShow 支持的设备列表（true 可用1替换）
+ffmpeg -list_devices true -f dshow -i dummy
+1
+这里写图片描述
+
+[dshow @ 00000000025d1ca0] DirectShow video devices (some may be both video and audio devices)
+[dshow @ 00000000025d1ca0]  "Logitech HD Webcam C310"
+[dshow @ 00000000025d1ca0]     Alternative name "@device_pnp_\\?\usb#vid_046d&pid_081b&mi_00#6&98e0120&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\{bbefb6c7-2fc4-4139-bb8b-a58bba724083}"
+[dshow @ 00000000025d1ca0] DirectShow audio devices
+[dshow @ 00000000025d1ca0]  "楹﹀厠椋?(HD Webcam C310)"
+
+上述命令有问题：audio那里有乱码，把乱码ANSI转UTF-8之后，开始测试不行，后来发现是自己疏忽大意，乱码部分转码后为“内装麦克风 ”，然后接可以正常使用了.
+
+中文乱码查看
+如果不熟悉ANSI转码UTF-8的话，还有一种更简单的方式查看设备的名称。即不使用FFmpeg查看系统DirectShow输入设备的名称，而使用Windows kit自带的工具graphedt.exe（或者网上下一个GraphStudioNext）查看输入名称。
+
+选择【图像】->【插入过滤】，可以看到中文名称为“麦克风 (HD Webcam C310)”，注意中间括号前有空格。 
+这里写图片描述
+
+视频录制
+//方式一
+ffmpeg -f dshow -i video="Logitech HD Webcam C310" -vcodec libx264 e:\\001.mkv
+
+//方式二:“-r 5”的意思是把帧率设置成5
+ffmpeg -f dshow -i video="Logitech HD Webcam C310" -r 5 -vcodec libx264 -preset:v ultrafast -tune:v zerolatency e:\\MyDesktop.mkv  
+
+上面组合命令设置了x264参数和aac添加adst filter， 
+如果想提高x264编码速度可使用 -preset:v ultrafast -tune:v zerolatency 两个参数， 
+举个例子： 
+ffmpeg -f dshow -i video=”Logitech HD Webcam C310” -vcodec libx264 -preset:v ultrafast -tune:v zerolatency e:\004.mp4
+
+录一段视频，按 q 键停止.
+
+播放：
+
+ffplay e:\\001.mkv
+1
+音频录制
+//test1
+ffmpeg -f dshow -i audio="麦克风 (HD Webcam C310)" -acodec aac e:\\temp.aac
+//test2
+ffmpeg -f dshow -i audio="麦克风 (HD Webcam C310)"  -ar 16000 -ac 1 lib.wav
+
+视频生成图片
+::1秒输出一张图片，从26秒开始，持续7秒
+::ffmpeg -i toolba.mkv -r 1 -ss 00:00:26 -t 00:00:07 %03d.png
+@echo off
+set input_dir=
+echo %~d0
+echo %cd%
+echo %input_path%/png/
+for /r %input_path% %%i in (*.avi) do (
+ffmpeg -i %%i -r 1 png/%%~ni_%%03d.png )
+::ffmpeg -i bianyuehui.avi -r 10  %input_path%/png/%%03d.png
+pause
+
+批处理for循环逐一处理目录中的文件
+
+图片生成录制
+//1.截取视频某一秒图片
+ffmpeg -ss 00:02:06 -i 3.flv -f image2 -y test1.jpg
+//2.实时抓取图片
+ffmpeg -f dshow -rtbufsize 200M -i video="Logitech HD Webcam C310" -r 1 -f image2 image%03d.jpeg
+
+音视频联合录制
+//test1
+ffmpeg -f dshow -i video="Logitech HD Webcam C310":audio="麦克风 (HD Webcam C310)" -s 640x360 -b:v 1000k -b:a 128k e:\\output.mkv
+
+//test2
+ffmpeg -f dshow -i video="Logitech HD Webcam C310":audio="麦克风 (HD Webcam C310)" -r 5 -vcodec libx264 -preset:v ultrafast -tune:v zerolatency -acodec libmp3lame e:\\002.mkv 
+
+//test3
+ffmpeg -f dshow -i video="Logitech HD Webcam C310":audio="麦克风 (HD Webcam C310)" -pix_fmt yuv420p -ar 48000 -vcodec libx264 -crf 23 -preset veryslow -x264opts b-adapt=2:bframes=0:aq-strength=1:psy-rd=0.8,0 -vsync vfr -acodec aac -bsf:a aac_adtstoasc -f flv e:\\002.flv
+
+实战
+音视频实时采集输出
+ffmpeg -f dshow -rtbufsize 200M -i video="Logitech HD Webcam C310":audio="麦克风 (HD Webcam C310)" -pix_fmt yuv420p -ar 48000 -vcodec libx264 -crf 23 -preset veryslow -x264opts b-adapt=2:bframes=0:aq-strength=1:psy-rd=0.8,0 -vsync vfr -acodec aac -bsf:a aac_adtstoasc -f flv e:\\002.flv
+1
+音视频和图片实时采集输出
+ffmpeg -f dshow -rtbufsize 200M -i video="Logitech HD Webcam C310":audio="麦克风 (HD Webcam C310)" -pix_fmt yuv420p -ar 48000 -vcodec libx264 -crf 23 -preset veryslow -x264opts b-adapt=2:bframes=0:aq-strength=1:psy-rd=0.8,0 -vsync vfr -acodec aac -bsf:a aac_adtstoasc -f flv 3.flv -r 1 -f image2 image%03d.jpeg
+1
+2
+音视频编辑
+合成
+音视频合成
+ffmpeg -i a.wav  -i a.avi out.avi 
+1
+音视频合成-延迟
+ffmpeg.exe -i user_review.wav -i user_review.avi -filter_complex "adelay=3000|3000"  out.avi 
+//-filter_complex "adelay=3000|3000"：对前面的ogg音频的两个声道都延迟3000毫秒 
+//参考：http://ffmpeg.org/ffmpeg-all.html#adelay 
+1
+2
+3
+参考：ffmpeg音视频合成
+
+多个视屏合成
+/* 对于 avi 格式 */
+@echo off
+ffmpeg -i "concat:input1.avi|input2.avi" -c copy output.avi
+paus
+1
+2
+3
+4
+/*对于MP4等其他格式*/
+//方法二：FFmpeg concat 分离器
+//这种方法成功率很高，也是最好的，但是需要 FFmpeg 1.1 以上版本。先创建一个文本文件filelist.txt：
+file 'input1.mkv'
+file 'input2.mkv'
+file 'input3.mkv'
+//然后：
+ ffmpeg -f concat -i filelist.txt -c copy output.mkv
+//注意：使用 FFmpeg concat 分离器时，如果文件名有奇怪的字符，要在 filelist.txt 中转义。
+1
+2
+3
+4
+5
+6
+7
+8
+9
+FFMpeg无损合并视频的多种方法 
+FFMPEG使用参数详解
+
+剪切
+视频剪切
+ffmpeg -i test.mp4 -ss 10 -t 15 -codec copy cut.mp4
+
+//参数说明：
+-i : source 
+-ss: start time 
+-t : duration 
+1
+2
+3
+4
+5
+6
+ffmpeg视频精准剪切
+
+视频裁剪
+/* crop：裁剪矩形尺寸，scale：缩放尺寸*/
+ffmpeg -i input.mp4 -vf crop=w:h:x:y,scale=640:480 out.mp4
+1
+2
+ffmpeg调整缩放裁剪视频的基础知识
+
+获取音视频信息
+自动获取音视频设备名称
+@echo off&setlocal enabledelayedexpansion
+
+::method 1: 固定设备名称
+REM ::延时2秒
+REM ::ping -n 1 127.0.0.1>nul
+REM ffmpeg -f dshow -i audio="麦克风 (HD Webcam C310)"  -ar 16000 -ac 1 %1
+
+REM ::del /f /s /q %1
+REM ::del /f /s /q plot\\data\\img\\*.*
+
+REM ::录制音视频图片
+REM ::ffmpeg -f dshow -rtbufsize 200M -i video="Logitech HD Webcam C310":audio="麦克风 (HD Webcam C310)" -pix_fmt yuv420p -ar 48000 -vcodec libx264 -crf 23 -preset veryslow -x264opts b-adapt=2:bframes=0:aq-strength=1:psy-rd=0.8,0 -vsync vfr -acodec aac -bsf:a aac_adtstoasc -f flv %1  -r 1000 -f image2 plot\\data\\img\\image%%3d.jpg
+
+
+
+::method 2: 自动获取设备名称
+::ffmpeg默认输出utf-8
+ffmpeg -list_devices true -f dshow -i dummy 2>temp_utf.txt
+
+::utf-8 转 gbk,批处理不支持utf-8文件
+iconv.exe -f utf-8 -t gbk temp_utf.txt >temp_gbk.txt
+REM findstr /c:"dshow @ " temp_gbk.txt>e1.txt
+
+set find_audio_name=0
+for /f "delims=" %%i in (temp_gbk.txt) do (
+
+    ::找到"DirectShow audio devices" 的下一行即为设备名
+    echo %%i | findstr /c:"DirectShow audio devices" >nul 2>nul
+    if !find_audio_name! equ 1 (
+        echo %%i
+        for /f tokens^=2^ delims^=^" %%a in ("%%i") do (
+            echo "%%a" >out.txt
+            goto end
+        )
+    )
+
+    ::设置标志
+    if !errorlevel! equ 0 (
+        set find_audio_name=1
+        echo find
+    ) else (
+        echo not find
+    )
+)
+
+:end
+for /f "delims=" %%a in (out.txt) do (
+    echo %%a
+    ffmpeg -f dshow -i audio=%%a  -ar 16000 -ac 1 %1    
+)
+
+::删除临时文件
+del /f /s /q temp_utf.txt
+del /f /s /q temp_gbk.txt
+del /f /s /q out.txt
+
+pause
+
+参考：使用windows命令和iconv.exe批量转换文件编码
+
+获取视频时长
+ffprobe -loglevel quiet -print_format json -show_format -show_streams -i user_review.avi
+1
+python代码
+
+#获取视频时长
+def getLenTime(filename):
+     command = ["ffprobe.exe","-loglevel","quiet","-print_format","json","-show_format","-show_streams","-i",filename]
+     result = subprocess.Popen(command,shell=True,stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+     out = result.stdout.read()
+     #print(str(out))
+     temp = str(out.decode('utf-8'))
+     data = json.loads(temp)['format']['duration']
+     return data
+
+https://blog.csdn.net/xiake001/article/details/78152700
+======================================================================================================
+ffmpeg中文文档  http://www.360doc.com/content/16/0512/20/496343_558600080.shtml
+
+======================================================================================================
+C# Winfrom使用ffmpeg转换视频格式 - CSDN博客  https://blog.csdn.net/wu_zongwen/article/details/79496431
+======================================================================================================
+
+======================================================================================================
+
+======================================================================================================
+
+======================================================================================================
+
+======================================================================================================
+
+======================================================================================================
+
+======================================================================================================
+
+======================================================================================================

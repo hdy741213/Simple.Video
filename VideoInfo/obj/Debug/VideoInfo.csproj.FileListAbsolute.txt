@@ -1,0 +1,12 @@
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\bin\Debug\VideoInfo.exe.config
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\bin\Debug\VideoInfo.exe
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\bin\Debug\VideoInfo.pdb
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\bin\Debug\Simple.Video.dll
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\bin\Debug\Simple.Video.pdb
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\obj\Debug\VideoInfo.csprojResolveAssemblyReference.cache
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\obj\Debug\VideoInfo.Form1.resources
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\obj\Debug\VideoInfo.Properties.Resources.resources
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\obj\Debug\VideoInfo.csproj.GenerateResource.Cache
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\obj\Debug\VideoInfo.exe
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\obj\Debug\VideoInfo.pdb
+C:\Users\hdy74\Desktop\Simple.Video\VideoInfo\obj\Debug\VideoInfoTest.Form1.resources

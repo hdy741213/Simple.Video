@@ -1,0 +1,11 @@
+C:\Users\hdy74\Desktop\Simple.Video\SnapScreenDemo\bin\Debug\SnapScreenDemo.exe.config
+C:\Users\hdy74\Desktop\Simple.Video\SnapScreenDemo\bin\Debug\SnapScreenDemo.exe
+C:\Users\hdy74\Desktop\Simple.Video\SnapScreenDemo\bin\Debug\SnapScreenDemo.pdb
+C:\Users\hdy74\Desktop\Simple.Video\SnapScreenDemo\bin\Debug\Simple.Video.dll
+C:\Users\hdy74\Desktop\Simple.Video\SnapScreenDemo\bin\Debug\Simple.Video.pdb
+C:\Users\hdy74\Desktop\Simple.Video\SnapScreenDemo\obj\Debug\SnapScreenDemo.csprojResolveAssemblyReference.cache
+C:\Users\hdy74\Desktop\Simple.Video\SnapScreenDemo\obj\Debug\SnapScreenDemo.Form1.resources
+C:\Users\hdy74\Desktop\Simple.Video\SnapScreenDemo\obj\Debug\SnapScreenDemo.Properties.Resources.resources
+C:\Users\hdy74\Desktop\Simple.Video\SnapScreenDemo\obj\Debug\SnapScreenDemo.csproj.GenerateResource.Cache
+C:\Users\hdy74\Desktop\Simple.Video\SnapScreenDemo\obj\Debug\SnapScreenDemo.exe
+C:\Users\hdy74\Desktop\Simple.Video\SnapScreenDemo\obj\Debug\SnapScreenDemo.pdb

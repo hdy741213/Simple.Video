@@ -1,0 +1,8 @@
+C:\Users\hdy74\Desktop\Simple.Video\Simple.Video\bin\Debug\Simple.Video.dll
+C:\Users\hdy74\Desktop\Simple.Video\Simple.Video\bin\Debug\Simple.Video.pdb
+C:\Users\hdy74\Desktop\Simple.Video\Simple.Video\obj\Debug\Simple.Video.dll
+C:\Users\hdy74\Desktop\Simple.Video\Simple.Video\obj\Debug\Simple.Video.pdb
+D:\桌面\Simple.Video\Simple.Video\bin\Debug\Simple.Video.dll
+D:\桌面\Simple.Video\Simple.Video\bin\Debug\Simple.Video.pdb
+D:\桌面\Simple.Video\Simple.Video\obj\Debug\Simple.Video.dll
+D:\桌面\Simple.Video\Simple.Video\obj\Debug\Simple.Video.pdb
